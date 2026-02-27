@@ -107,25 +107,27 @@ function maHinzufuegen() {
 }
 
 function maDuplizieren() {
-    if (SEL === null || !P || !P.mitarbeiter || !P.mitarbeiter[SEL]) { showToast('Mitarbeiter auswählen', 'error'); return; }
+    if (SEL === null || !P || !P.mitarbeiter || !P.mitarbeiter[SEL]) { showToast('Mitarbeitende auswählen', 'error'); return; }
     var src = P.mitarbeiter[SEL];
     // Deep copy ohne interne Felder
     var mc = JSON.parse(JSON.stringify(src));
     delete mc._id; delete mc._berechnung; delete mc._jahresgesamt;
+
+    // Vermeidet Konflikte (z.B. Unique-Constraint auf PNR)
+    mc.pnr = '';
+    mc.vorname = mc.vorname || '';
     mc.nachname = (mc.nachname || 'Neu') + ' (Kopie)';
-    // In der EXE bleibt PNR bestehen; wenn du lieber leeren willst: mc.pnr = '';
+
     dbMaSpeichern(PID, mc).then(function() {
         return ladeProjekt();
     }).then(function() {
-        // Neueste Kopie selektieren (letzter Eintrag mit gleichem Namen)
-        var idx = null;
-        for (var i = P.mitarbeiter.length - 1; i >= 0; i--) {
-            if (P.mitarbeiter[i] && P.mitarbeiter[i].nachname === mc.nachname && P.mitarbeiter[i].vorname === mc.vorname) { idx = i; break; }
-        }
-        if (idx === null) idx = P.mitarbeiter.length - 1;
-        SEL = idx;
-        if (P.mitarbeiter[SEL]) selectMa(SEL);
+        // Letzten Eintrag auswählen
+        SEL = (P.mitarbeiter && P.mitarbeiter.length) ? (P.mitarbeiter.length - 1) : null;
+        if (SEL !== null) selectMa(SEL);
         showToast('Dupliziert');
+    }).catch(function(err){
+        console.error(err);
+        showToast('Duplizieren fehlgeschlagen', 'error');
     });
 }
 function maLoeschen() {
