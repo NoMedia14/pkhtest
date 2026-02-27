@@ -13,9 +13,6 @@
             <span id="nav-title">PKR</span>
         </div>
         <div class="nav-actions">
-            <button class="btn btn-sm btn-secondary" onclick="projektExportJSON()">⬇︎ Export</button>
-            <button class="btn btn-sm btn-secondary" onclick="projektImportJSON()">⬆︎ Import</button>
-            <input type="file" id="file-import-projekt" accept=".json,.pkr,application/json" style="display:none" onchange="onProjektImportFile(this.files)">
             <span id="save-indicator" class="save-indicator"></span>
             <button class="btn btn-sm btn-secondary" onclick="projektSpeichern()">💾 Speichern</button>
         </div>
@@ -24,6 +21,7 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <input type="text" id="ma-suche" class="input input-sm" placeholder="Suchen..." oninput="filterListe()">
+                <button class="btn btn-sm btn-secondary" onclick="maDuplizieren()" title="Duplizieren">⧉</button>
                 <button class="btn btn-sm btn-primary" onclick="maHinzufuegen()" title="Hinzufügen">+</button>
             </div>
             <div class="sidebar-filters">
@@ -105,6 +103,25 @@
                 <div class="analyse-grid">
                     <div class="card"><h3>Gesamtübersicht</h3><div id="analyse-gesamt"></div></div>
                     <div class="card"><h3>Monatsverlauf</h3><canvas id="chart-verlauf" height="250"></canvas></div>
+                    <div class="card"><h3>Export</h3>
+                        <div class="form-row" style="gap:10px;flex-wrap:wrap">
+                            <button class="btn btn-secondary" onclick="exportPdfUebersicht()">PDF (Übersicht)</button>
+                            <button class="btn btn-secondary" onclick="exportXlsxUebersicht()">Excel (XLSX)</button>
+                        </div>
+                        <div class="text-muted" style="margin-top:8px;font-size:12px">Export entspricht der EXE-Übersicht (inkl. Summen und Zusammenfassungen).</div>
+                    </div>
+                    <div class="card card-wide"><h3>Szenariovergleich</h3>
+                        <div class="form-row" style="gap:10px;flex-wrap:wrap">
+                            <button class="btn btn-secondary" onclick="showSzenarioDialog()">Szenarien bearbeiten</button>
+                            <button class="btn btn-primary" onclick="szenarioVergleichen()">Vergleichen</button>
+                            <button class="btn btn-secondary" onclick="exportSzenarioPdf()">PDF Export</button>
+                        </div>
+                        <div style="margin-top:10px"><canvas id="chart-szenario" height="220"></canvas></div>
+                        <table class="data-table data-table-numbers" id="tbl-szenario" style="margin-top:10px">
+                            <thead><tr><th>Szenario</th><th>Jahreskosten</th><th>Differenz</th></tr></thead>
+                            <tbody><tr><td colspan="3" class="text-muted">–</td></tr></tbody>
+                        </table>
+                    </div>
                     <div class="card"><h3>Nach Dienstart</h3><table class="data-table data-table-numbers" id="tbl-analyse-da"><thead><tr><th>DA</th><th>Bezeichnung</th><th>MA</th><th>Jahreskosten</th></tr></thead><tbody></tbody></table></div>
                     <div class="card"><h3>Nach Kostenstelle</h3><table class="data-table data-table-numbers" id="tbl-analyse-kst"><thead><tr><th>KSt</th><th>Bezeichnung</th><th>MA</th><th>Jahreskosten</th></tr></thead><tbody></tbody></table></div>
                 </div>
@@ -156,11 +173,28 @@
         <div class="form-group"><label>Bemerkung</label><input type="text" id="d-abw-bem" class="input"></div>
         <div class="dialog-actions"><button class="btn btn-secondary" onclick="this.closest('dialog').close()">Abbrechen</button><button class="btn btn-primary" onclick="abwesenheitOk()">Übernehmen</button></div>
     </div></dialog>
+    <dialog id="dlg-szenario"><div class="dialog-content" style="max-width:720px">
+        <h2>Szenarien</h2>
+        <div class="text-muted" style="margin-bottom:8px">Hinweis: Szenarien 1..n blenden IST-Daten aus (wie in der EXE).</div>
+        <div id="sz-list" class="sz-list"></div>
+        <div class="form-row mt-2" style="gap:10px">
+            <input type="text" id="sz-name" class="input" placeholder="Neues Szenario (Name)">
+            <button class="btn btn-sm btn-primary" onclick="szAdd()">+</button>
+        </div>
+        <div class="dialog-actions" style="justify-content:space-between">
+            <button class="btn btn-secondary" onclick="this.closest('dialog').close()">Schließen</button>
+            <button class="btn btn-primary" onclick="szSaveToProject()">Im Projekt speichern</button>
+        </div>
+    </div></dialog>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config.js"></script>
     <script src="js/calc.js"></script>
     <script src="js/db.js"></script>
+    <script src="js/export.js"></script>
     <script src="js/app.js"></script>
     <script>
         var pid = new URLSearchParams(window.location.search).get('id');

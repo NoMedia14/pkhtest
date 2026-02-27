@@ -11,7 +11,7 @@ function dbProjektListe() {
 
 function dbProjektErstellen(name, jahr) {
     var p = neuesProjekt(); p.name = name; p.jahr = jahr || p.jahr;
-    var einst = { sv:p.sv, tarife:p.tarife, dienstarten:p.dienstarten, kostenstellen:p.kostenstellen, entgelttabelle:p.entgelttabelle, sonderzahlung:p.sonderzahlung||{}, sz_monat:p.sz_monat, sz_prozent:p.sz_prozent, tariferhoehungen:p.tariferhoehungen };
+    var einst = { sv:p.sv, tarife:p.tarife, dienstarten:p.dienstarten, kostenstellen:p.kostenstellen, entgelttabelle:p.entgelttabelle, sonderzahlung:p.sonderzahlung||{}, sz_monat:p.sz_monat, sz_prozent:p.sz_prozent, tariferhoehungen:p.tariferhoehungen, szenarien:p.szenarien||[], log:p.log||[] };
     return _sb.from('projekte').insert({ name:p.name, jahr:p.jahr, einstellungen:einst }).select().single().then(function(r) { return r.error ? null : r.data; });
 }
 
@@ -21,7 +21,7 @@ function dbProjektLaden(id) {
         var pd = pr.data, einst = pd.einstellungen || {};
         var p = neuesProjekt();
         p.name = pd.name; p.jahr = pd.jahr; p._id = pd.id;
-        ['sv','tarife','dienstarten','kostenstellen','entgelttabelle','sonderzahlung','sz_monat','sz_prozent','tariferhoehungen'].forEach(function(k) { if (einst[k] !== undefined) p[k] = einst[k]; });
+        ['sv','tarife','dienstarten','kostenstellen','entgelttabelle','sonderzahlung','sz_monat','sz_prozent','tariferhoehungen','szenarien','log'].forEach(function(k) { if (einst[k] !== undefined) p[k] = einst[k]; });
         return _sb.from('mitarbeiter').select('*').eq('projekt_id', id).order('nachname').then(function(mr) {
             (mr.data || []).forEach(function(r) {
                 var anp = r.anpassungen || [];
@@ -45,7 +45,7 @@ function dbProjektLaden(id) {
 
 function dbProjektSpeichern(p) {
     var einst = {};
-    ['sv','tarife','dienstarten','kostenstellen','entgelttabelle','sonderzahlung','sz_monat','sz_prozent','tariferhoehungen'].forEach(function(k) { einst[k] = p[k]; });
+    ['sv','tarife','dienstarten','kostenstellen','entgelttabelle','sonderzahlung','sz_monat','sz_prozent','tariferhoehungen','szenarien','log'].forEach(function(k) { einst[k] = p[k]; });
     return _sb.from('projekte').update({ name:p.name, jahr:p.jahr, einstellungen:einst }).eq('id', p._id);
 }
 
@@ -75,59 +75,3 @@ function dbMaSpeichern(projektId, ma) {
 }
 
 function dbMaLoeschen(id) { return _sb.from('mitarbeiter').delete().eq('id', id); }
-
-// --- Import/Export Helpers ---
-function _maToRow(projektId, ma) {
-    var anp = (ma.stufenaufstiege||[]).concat(ma.ind_erhoehungen||[]).concat(ma.std_anpassungen||[]).concat(ma.abwesenheiten||[]);
-    return {
-        projekt_id: projektId,
-        pnr: ma.pnr||'', titel: ma.titel||'', vorname: ma.vorname||'', nachname: ma.nachname||'',
-        tarif: ma.tarif||'', eg: ma.eg||'', stufe: ma.stufe||'',
-        brutto: parseFloat(ma.brutto)||0, vk: parseFloat(ma.vk)||1.0,
-        da: ma.da||'', kst: ma.kst||'',
-        eintritt: ma.eintritt||null, austritt: ma.austritt||null,
-        bemerkung: ma.bemerkung||'',
-        ist_daten: ma.ist_daten||{}, sz_override: ma.sz_override||null,
-        extra: ma.extra||{}, anpassungen: anp
-    };
-}
-
-// Importiert ein Projekt als NEUES Projekt (inkl. Mitarbeitende)
-function dbProjektImportNeu(p) {
-    var einst = {};
-    ['sv','tarife','dienstarten','kostenstellen','entgelttabelle','sonderzahlung','sz_monat','sz_prozent','tariferhoehungen',
-     'ist_ab_monat','szenarien','log','aenderungen','logo_dataurl','extra_spalten','sichtbare_spalten','gruppierung'
-    ].forEach(function(k){ if (p[k] !== undefined) einst[k]=p[k]; });
-
-    return _sb.from('projekte').insert({ name:p.name||'Import', jahr:p.jahr||new Date().getFullYear(), einstellungen:einst })
-      .select().single().then(function(r){
-        if (r.error || !r.data) return null;
-        var pid = r.data.id;
-        var rows = (p.mitarbeiter||[]).map(function(ma){ return _maToRow(pid, ma); });
-        if (!rows.length) return r.data;
-        return _sb.from('mitarbeiter').insert(rows).then(function(rr){
-            return rr.error ? null : r.data;
-        });
-      });
-}
-
-// Überschreibt ein bestehendes Projekt (Einstellungen + Mitarbeitende komplett ersetzen)
-function dbProjektOverwrite(p) {
-    var einst = {};
-    ['sv','tarife','dienstarten','kostenstellen','entgelttabelle','sonderzahlung','sz_monat','sz_prozent','tariferhoehungen',
-     'ist_ab_monat','szenarien','log','aenderungen','logo_dataurl','extra_spalten','sichtbare_spalten','gruppierung'
-    ].forEach(function(k){ if (p[k] !== undefined) einst[k]=p[k]; });
-
-    return _sb.from('projekte').update({ name:p.name, jahr:p.jahr, einstellungen:einst }).eq('id', p._id)
-      .then(function(up){
-        if (up.error) return null;
-        return _sb.from('mitarbeiter').delete().eq('projekt_id', p._id).then(function(){
-            var rows = (p.mitarbeiter||[]).map(function(ma){ return _maToRow(p._id, ma); });
-            if (!rows.length) return p;
-            return _sb.from('mitarbeiter').insert(rows).then(function(ins){
-                return ins.error ? null : p;
-            });
-        });
-      });
-}
-
