@@ -56,6 +56,7 @@ function ladeProjekt() {
     });
 }
 function projektSpeichern() {
+    logAdd("Projekt gespeichert");
     document.getElementById('save-indicator').textContent = 'Speichere...';
     einstellungenSpeichern(true).then(function() {
         document.getElementById('save-indicator').textContent = '✔ Gespeichert';
@@ -295,3 +296,110 @@ function csvImport(typ) {
         Promise.all(promises).then(function(){showToast(count+' importiert');ladeProjekt();});
     });
 }
+
+// ─── Projekt Import/Export (JSON) ───────────────────────────────────
+function _cleanProjectForExport(p) {
+    var cp = JSON.parse(JSON.stringify(p||{}));
+    // remove runtime fields
+    delete cp._gesamtkosten;
+    (cp.mitarbeiter||[]).forEach(function(ma){
+        delete ma._berechnung;
+        delete ma._jahresgesamt;
+        delete ma._id; // supabase row id
+    });
+    // keep project meta but remove internal id
+    delete cp._id;
+    return cp;
+}
+function _download(filename, text, mime) {
+    var blob = new Blob([text], {type: mime || 'application/json'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 0);
+}
+function projektExportJSON() {
+    if (!P) return;
+    var cp = _cleanProjectForExport(P);
+    var fn = (cp.name||'projekt').replace(/[^\w\-]+/g,'_') + '_' + (cp.jahr||'') + '.json';
+    _download(fn, JSON.stringify(cp, null, 2), 'application/json');
+    showToast('Projekt exportiert');
+}
+function projektImportJSON() {
+    var el = document.getElementById('file-import-projekt');
+    if (el) el.click();
+}
+function onProjektImportFile(files) {
+    if (!files || !files.length) return;
+    var f = files[0];
+    var r = new FileReader();
+    r.onload = function(){
+        try {
+            var data = JSON.parse(r.result);
+            // defaults + merge
+            var p = neuesProjekt();
+            Object.keys(data||{}).forEach(function(k){ p[k]=data[k]; });
+            p.name = p.name || 'Import';
+            // ask overwrite or new
+            var ow = confirm('Import: aktuelles Projekt überschreiben?\nOK = überschreiben, Abbrechen = als neues Projekt importieren.');
+            if (ow) {
+                p._id = P._id;
+                dbProjektOverwrite(p).then(function(res){
+                    if (!res) { showToast('Import fehlgeschlagen', 'error'); return; }
+                    showToast('Projekt überschrieben');
+                    ladeProjekt();
+                });
+            } else {
+                dbProjektImportNeu(p).then(function(pr){
+                    if (!pr) { showToast('Import fehlgeschlagen', 'error'); return; }
+                    window.location.href = 'projekt.html?id=' + pr.id;
+                });
+            }
+        } catch(e){
+            showToast('Ungültige Datei', 'error');
+        }
+    };
+    r.readAsText(f);
+    // reset input so same file can be re-imported
+    files = null;
+    var el = document.getElementById('file-import-projekt');
+    if (el) el.value='';
+}
+
+// Index: Import als neues Projekt
+function startProjektImport() {
+    var el = document.getElementById('file-import-projekt-index');
+    if (el) el.click();
+}
+function onProjektImportFileIndex(files) {
+    if (!files || !files.length) return;
+    var f = files[0];
+    var r = new FileReader();
+    r.onload = function(){
+        try {
+            var data = JSON.parse(r.result);
+            var p = neuesProjekt();
+            Object.keys(data||{}).forEach(function(k){ p[k]=data[k]; });
+            p.name = p.name || 'Import';
+            dbProjektImportNeu(p).then(function(pr){
+                if (!pr) { showToast('Import fehlgeschlagen', 'error'); return; }
+                window.location.href = 'projekt.html?id=' + pr.id;
+            });
+        } catch(e){
+            showToast('Ungültige Datei', 'error');
+        }
+    };
+    r.readAsText(f);
+    var el = document.getElementById('file-import-projekt-index');
+    if (el) el.value='';
+}
+
+// ─── Einfaches Projekt-Log ──────────────────────────────────────────
+function logAdd(msg) {
+    if (!P) return;
+    if (!P.log) P.log = [];
+    P.log.push({ ts: new Date().toISOString(), msg: String(msg||'') });
+}
+
