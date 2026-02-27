@@ -39,7 +39,6 @@
                 <button class="tab" data-tab="analyse" onclick="switchTab('analyse')">Analysecenter</button>
                 <button class="tab" data-tab="einstellungen" onclick="switchTab('einstellungen')">Einstellungen</button>
             </div>
-            <!-- Stammdaten -->
             <div class="tab-content active" id="tab-stammdaten">
                 <div id="stamm-empty" class="empty-state">Mitarbeiter auswählen oder neu anlegen</div>
                 <div id="stamm-form" class="stamm-form" style="display:none">
@@ -74,7 +73,6 @@
                     </div>
                 </div>
             </div>
-            <!-- Planung -->
             <div class="tab-content" id="tab-planung">
                 <div id="plan-empty" class="empty-state">Mitarbeiter auswählen</div>
                 <div id="plan-content" style="display:none">
@@ -87,7 +85,6 @@
                     <table class="data-table" id="tbl-anpassungen"><thead><tr><th>Typ</th><th>Details</th><th>Ab Monat</th><th>Bemerkung</th><th></th></tr></thead><tbody></tbody></table>
                 </div>
             </div>
-            <!-- Hochrechnung -->
             <div class="tab-content" id="tab-hochrechnung">
                 <div id="hr-empty" class="empty-state">Mitarbeiter auswählen</div>
                 <div id="hr-content" style="display:none">
@@ -98,7 +95,6 @@
                     </table>
                 </div>
             </div>
-            <!-- Analyse -->
             <div class="tab-content" id="tab-analyse">
                 <div class="analyse-grid">
                     <div class="card"><h3>Gesamtübersicht</h3><div id="analyse-gesamt"></div></div>
@@ -126,7 +122,6 @@
                     <div class="card"><h3>Nach Kostenstelle</h3><table class="data-table data-table-numbers" id="tbl-analyse-kst"><thead><tr><th>KSt</th><th>Bezeichnung</th><th>MA</th><th>Jahreskosten</th></tr></thead><tbody></tbody></table></div>
                 </div>
             </div>
-            <!-- Einstellungen -->
             <div class="tab-content" id="tab-einstellungen">
                 <div class="settings-grid">
                     <div class="card"><h3>Projektdaten</h3><div class="form-row"><div class="form-group fg-grow"><label>Name</label><input type="text" id="set-name" class="input"></div><div class="form-group"><label>Jahr</label><input type="number" id="set-jahr" class="input" style="width:100px"></div></div></div>
@@ -143,7 +138,6 @@
             </div>
         </main>
     </div>
-    <!-- Dialoge -->
     <dialog id="dlg-stufe"><div class="dialog-content"><h2>Stufenaufstieg</h2>
         <div class="form-group"><label>Tarif</label><select id="d-st-tarif" class="input" onchange="dlgStufeUpd()"></select></div>
         <div class="form-group"><label>EG</label><select id="d-st-eg" class="input" onchange="dlgStufeUpd()"></select></div>
