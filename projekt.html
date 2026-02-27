@@ -7,58 +7,198 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-
-<nav class="navbar">
-    <div class="nav-brand">
-        <a href="index.html">←</a>
-        <span id="nav-title">PKR</span>
-    </div>
-    <div class="nav-actions">
-        <span id="save-indicator"></span>
-        <button onclick="projektSpeichern()">💾 Speichern</button>
-    </div>
-</nav>
-
-<div class="app-layout">
-    <aside class="sidebar">
-        <div class="sidebar-header">
-            <input type="text" id="ma-suche" oninput="filterListe()">
-            <button onclick="maHinzufuegen()">+</button>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="index.html" class="nav-back" title="Zurück"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></a>
+            <span id="nav-title">PKR</span>
         </div>
-
-        <div id="ma-liste"></div>
-        <div id="gesamtkosten">Gesamtkosten: –</div>
-    </aside>
-
-    <main class="main-content">
-        <div class="tabs">
-            <button onclick="switchTab('stammdaten')">Stammdaten</button>
-            <button onclick="switchTab('planung')">Planung</button>
-            <button onclick="switchTab('hochrechnung')">Hochrechnung</button>
-            <button onclick="switchTab('analyse')">Analysecenter</button>
-            <button onclick="switchTab('einstellungen')">Einstellungen</button>
+        <div class="nav-actions">
+            <span id="save-indicator" class="save-indicator"></span>
+            <button class="btn btn-sm btn-secondary" onclick="projektSpeichern()">💾 Speichern</button>
         </div>
-
-        <div id="tab-stammdaten"></div>
-        <div id="tab-planung"></div>
-        <div id="tab-hochrechnung"></div>
-        <div id="tab-analyse"></div>
-        <div id="tab-einstellungen"></div>
-    </main>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js"></script>
-<script src="js/calc.js"></script>
-<script src="js/db.js"></script>
-<script src="js/app.js"></script>
-
-<script>
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get('id');
-    initDB(SUPABASE_URL, SUPABASE_KEY);
-    if (id) initProjekt(id);
-</script>
-
+    </nav>
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <input type="text" id="ma-suche" class="input input-sm" placeholder="Suchen..." oninput="filterListe()">
+                <button class="btn btn-sm btn-primary" onclick="maHinzufuegen()" title="Hinzufügen">+</button>
+            </div>
+            <div class="sidebar-filters">
+                <select id="filter-da" class="input input-sm" onchange="filterListe()"><option value="">Alle DA</option></select>
+                <select id="filter-kst" class="input input-sm" onchange="filterListe()"><option value="">Alle KSt</option></select>
+            </div>
+            <div id="ma-liste" class="ma-list"></div>
+            <div class="sidebar-footer"><div id="gesamtkosten" class="gesamtkosten">Gesamtkosten: –</div></div>
+        </aside>
+        <main class="main-content">
+            <div class="tabs">
+                <button class="tab active" data-tab="stammdaten" onclick="switchTab('stammdaten')">Stammdaten</button>
+                <button class="tab" data-tab="planung" onclick="switchTab('planung')">Planung</button>
+                <button class="tab" data-tab="hochrechnung" onclick="switchTab('hochrechnung')">Hochrechnung</button>
+                <button class="tab" data-tab="analyse" onclick="switchTab('analyse')">Analysecenter</button>
+                <button class="tab" data-tab="einstellungen" onclick="switchTab('einstellungen')">Einstellungen</button>
+            </div>
+            <!-- Stammdaten -->
+            <div class="tab-content active" id="tab-stammdaten">
+                <div id="stamm-empty" class="empty-state">Mitarbeiter auswählen oder neu anlegen</div>
+                <div id="stamm-form" class="stamm-form" style="display:none">
+                    <div class="form-grid">
+                        <fieldset><legend>Persönliche Daten</legend><div class="form-row">
+                            <div class="form-group"><label>PNR</label><input type="text" id="s-pnr" class="input"></div>
+                            <div class="form-group"><label>Titel</label><input type="text" id="s-titel" class="input" style="width:80px"></div>
+                            <div class="form-group fg-grow"><label>Nachname</label><input type="text" id="s-nachname" class="input"></div>
+                            <div class="form-group fg-grow"><label>Vorname</label><input type="text" id="s-vorname" class="input"></div>
+                        </div></fieldset>
+                        <fieldset><legend>Vergütung</legend><div class="form-row">
+                            <div class="form-group"><label>Tarif</label><select id="s-tarif" class="input" onchange="onTarifChanged()"></select></div>
+                            <div class="form-group"><label>EG</label><select id="s-eg" class="input" onchange="onEgChanged()"></select></div>
+                            <div class="form-group"><label>Stufe</label><select id="s-stufe" class="input" onchange="onStufeChanged()"></select></div>
+                            <div class="form-group"><label>Monatsbrutto (€)</label><input type="text" id="s-brutto" class="input" style="width:120px"></div>
+                        </div></fieldset>
+                        <fieldset><legend>Organisation</legend><div class="form-row">
+                            <div class="form-group"><label>Dienstart</label><select id="s-da" class="input"></select></div>
+                            <div class="form-group"><label>Kostenstelle</label><select id="s-kst" class="input"></select></div>
+                            <div class="form-group"><label>VK</label><input type="text" id="s-vk" class="input" style="width:80px" value="1,0" oninput="updateWstd()"></div>
+                            <div class="form-group"><label>Wochenstd.</label><span id="s-wstd" class="input-display">–</span></div>
+                        </div></fieldset>
+                        <fieldset><legend>Ein-/Austritt</legend><div class="form-row">
+                            <div class="form-group"><label>Eintritt</label><input type="date" id="s-eintritt" class="input"></div>
+                            <div class="form-group"><label>Austritt</label><input type="date" id="s-austritt" class="input"></div>
+                        </div></fieldset>
+                        <fieldset><legend>Bemerkungen</legend><textarea id="s-bemerkung" class="input" rows="3" style="width:100%"></textarea></fieldset>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary" onclick="stammSpeichern()">Stammdaten speichern</button>
+                        <button class="btn btn-danger-ghost" onclick="maLoeschen()">Entfernen</button>
+                    </div>
+                </div>
+            </div>
+            <!-- Planung -->
+            <div class="tab-content" id="tab-planung">
+                <div id="plan-empty" class="empty-state">Mitarbeiter auswählen</div>
+                <div id="plan-content" style="display:none">
+                    <div class="plan-actions">
+                        <button class="btn btn-sm btn-secondary" onclick="dlgStufenaufstieg()">Stufenaufstieg</button>
+                        <button class="btn btn-sm btn-secondary" onclick="dlgErhoehung()">Erhöhung</button>
+                        <button class="btn btn-sm btn-secondary" onclick="dlgStundenanpassung()">Stundenanpassung</button>
+                        <button class="btn btn-sm btn-secondary" onclick="dlgAbwesenheit()">Abwesenheit</button>
+                    </div>
+                    <table class="data-table" id="tbl-anpassungen"><thead><tr><th>Typ</th><th>Details</th><th>Ab Monat</th><th>Bemerkung</th><th></th></tr></thead><tbody></tbody></table>
+                </div>
+            </div>
+            <!-- Hochrechnung -->
+            <div class="tab-content" id="tab-hochrechnung">
+                <div id="hr-empty" class="empty-state">Mitarbeiter auswählen</div>
+                <div id="hr-content" style="display:none">
+                    <table class="data-table data-table-numbers" id="tbl-hochrechnung">
+                        <thead><tr><th>Monat</th><th>VK</th><th>Anteil</th><th>Brutto</th><th>SZ</th><th>AG</th><th>Gesamt</th></tr></thead>
+                        <tbody></tbody>
+                        <tfoot><tr><th>Summe</th><td></td><td></td><td id="hr-sum-b"></td><td id="hr-sum-sz"></td><td id="hr-sum-ag"></td><td id="hr-sum-g"></td></tr></tfoot>
+                    </table>
+                </div>
+            </div>
+            <!-- Analyse -->
+            <div class="tab-content" id="tab-analyse">
+                <div class="analyse-grid">
+                    <div class="card"><h3>Gesamtübersicht</h3><div id="analyse-gesamt"></div></div>
+                    <div class="card"><h3>Monatsverlauf</h3><canvas id="chart-verlauf" height="250"></canvas></div>
+                    <div class="card"><h3>Export</h3>
+                        <div class="form-row" style="gap:10px;flex-wrap:wrap">
+                            <button class="btn btn-secondary" onclick="exportPdfUebersicht()">PDF (Übersicht)</button>
+                            <button class="btn btn-secondary" onclick="exportXlsxUebersicht()">Excel (XLSX)</button>
+                        </div>
+                        <div class="text-muted" style="margin-top:8px;font-size:12px">Export entspricht der EXE-Übersicht (inkl. Summen und Zusammenfassungen).</div>
+                    </div>
+                    <div class="card card-wide"><h3>Szenariovergleich</h3>
+                        <div class="form-row" style="gap:10px;flex-wrap:wrap">
+                            <button class="btn btn-secondary" onclick="showSzenarioDialog()">Szenarien bearbeiten</button>
+                            <button class="btn btn-primary" onclick="szenarioVergleichen()">Vergleichen</button>
+                            <button class="btn btn-secondary" onclick="exportSzenarioPdf()">PDF Export</button>
+                        </div>
+                        <div style="margin-top:10px"><canvas id="chart-szenario" height="220"></canvas></div>
+                        <table class="data-table data-table-numbers" id="tbl-szenario" style="margin-top:10px">
+                            <thead><tr><th>Szenario</th><th>Jahreskosten</th><th>Differenz</th></tr></thead>
+                            <tbody><tr><td colspan="3" class="text-muted">–</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div class="card"><h3>Nach Dienstart</h3><table class="data-table data-table-numbers" id="tbl-analyse-da"><thead><tr><th>DA</th><th>Bezeichnung</th><th>MA</th><th>Jahreskosten</th></tr></thead><tbody></tbody></table></div>
+                    <div class="card"><h3>Nach Kostenstelle</h3><table class="data-table data-table-numbers" id="tbl-analyse-kst"><thead><tr><th>KSt</th><th>Bezeichnung</th><th>MA</th><th>Jahreskosten</th></tr></thead><tbody></tbody></table></div>
+                </div>
+            </div>
+            <!-- Einstellungen -->
+            <div class="tab-content" id="tab-einstellungen">
+                <div class="settings-grid">
+                    <div class="card"><h3>Projektdaten</h3><div class="form-row"><div class="form-group fg-grow"><label>Name</label><input type="text" id="set-name" class="input"></div><div class="form-group"><label>Jahr</label><input type="number" id="set-jahr" class="input" style="width:100px"></div></div></div>
+                    <div class="card"><h3>Sozialversicherung (AG %)</h3><div id="set-sv"></div><div id="sv-gesamt" class="sv-gesamt"></div></div>
+                    <div class="card"><h3>Jahressonderzahlung</h3><div class="form-row"><div class="form-group"><label>Monat</label><select id="set-sz-monat" class="input"></select></div><div class="form-group"><label>Prozent</label><input type="text" id="set-sz-proz" class="input" style="width:80px"></div></div></div>
+                    <div class="card"><h3>Tarife</h3><table class="data-table" id="tbl-tarife"><thead><tr><th>Tarif</th><th>Wochenstd.</th><th></th></tr></thead><tbody></tbody></table><div class="form-row mt-2"><input type="text" id="add-tarif-name" class="input input-sm" placeholder="Name"><input type="number" id="add-tarif-std" class="input input-sm" placeholder="Std" style="width:80px" value="39"><button class="btn btn-sm btn-primary" onclick="tarifAdd()">+</button></div></div>
+                    <div class="card"><h3>Dienstarten</h3><table class="data-table" id="tbl-da"><thead><tr><th>Code</th><th>Bezeichnung</th><th></th></tr></thead><tbody></tbody></table><div class="form-row mt-2"><input type="text" id="add-da-code" class="input input-sm" placeholder="Code" style="width:80px"><input type="text" id="add-da-bez" class="input input-sm" placeholder="Bezeichnung"><button class="btn btn-sm btn-primary" onclick="daAdd()">+</button></div></div>
+                    <div class="card"><h3>Kostenstellen</h3><table class="data-table" id="tbl-kst"><thead><tr><th>Code</th><th>Bezeichnung</th><th></th></tr></thead><tbody></tbody></table><div class="form-row mt-2"><input type="text" id="add-kst-code" class="input input-sm" placeholder="Code" style="width:80px"><input type="text" id="add-kst-bez" class="input input-sm" placeholder="Bezeichnung"><button class="btn btn-sm btn-primary" onclick="kstAdd()">+</button></div></div>
+                    <div class="card card-wide"><h3>Entgelttabelle</h3><table class="data-table data-table-numbers" id="tbl-et"><thead><tr><th>Tarif</th><th>EG</th><th>Stufe</th><th>Brutto (€)</th><th></th></tr></thead><tbody></tbody></table><div class="form-row mt-2"><select id="add-et-tarif" class="input input-sm"></select><input type="text" id="add-et-eg" class="input input-sm" placeholder="EG" style="width:80px"><input type="text" id="add-et-stufe" class="input input-sm" placeholder="Stufe" style="width:60px"><input type="text" id="add-et-brutto" class="input input-sm" placeholder="Brutto" style="width:100px"><button class="btn btn-sm btn-primary" onclick="etAdd()">+</button></div></div>
+                    <div class="card card-wide"><h3>Tariferhöhungen</h3><table class="data-table" id="tbl-te"><thead><tr><th>Ab Monat</th><th>Prozent</th><th>Betrag</th><th>Filter DA</th><th>Filter KSt</th><th></th></tr></thead><tbody></tbody></table><div class="form-row mt-2"><select id="add-te-monat" class="input input-sm"></select><input type="text" id="add-te-pz" class="input input-sm" placeholder="%" style="width:60px"><input type="text" id="add-te-bt" class="input input-sm" placeholder="€" style="width:80px"><button class="btn btn-sm btn-primary" onclick="teAdd()">+</button></div></div>
+                    <div class="card card-wide"><h3>CSV Import</h3><div class="form-row"><div class="form-group"><label>Mitarbeiter</label><input type="file" id="csv-ma" accept=".csv" class="input"><button class="btn btn-sm btn-secondary mt-1" onclick="csvImport('ma')">Importieren</button></div><div class="form-group"><label>IST-Daten</label><input type="file" id="csv-ist" accept=".csv" class="input"><button class="btn btn-sm btn-secondary mt-1" onclick="csvImport('ist')">Importieren</button></div></div></div>
+                    <div class="form-actions"><button class="btn btn-primary" onclick="einstellungenSpeichern()">Einstellungen speichern</button></div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <!-- Dialoge -->
+    <dialog id="dlg-stufe"><div class="dialog-content"><h2>Stufenaufstieg</h2>
+        <div class="form-group"><label>Tarif</label><select id="d-st-tarif" class="input" onchange="dlgStufeUpd()"></select></div>
+        <div class="form-group"><label>EG</label><select id="d-st-eg" class="input" onchange="dlgStufeUpd()"></select></div>
+        <div class="form-group"><label>Neue Stufe</label><select id="d-st-stufe" class="input" onchange="dlgStufeAutoB()"></select></div>
+        <div class="form-group"><label>Neues Brutto (€)</label><input type="text" id="d-st-brutto" class="input"></div>
+        <div class="form-group"><label>Ab Monat</label><select id="d-st-monat" class="input"></select></div>
+        <div class="form-group"><label>Bemerkung</label><input type="text" id="d-st-bem" class="input"></div>
+        <div class="dialog-actions"><button class="btn btn-secondary" onclick="this.closest('dialog').close()">Abbrechen</button><button class="btn btn-primary" onclick="stufenaufstiegOk()">Übernehmen</button></div>
+    </div></dialog>
+    <dialog id="dlg-erh"><div class="dialog-content"><h2>Individuelle Erhöhung</h2>
+        <div class="form-row"><label><input type="radio" name="erh-typ" value="pz" checked> Prozent</label><label><input type="radio" name="erh-typ" value="bt"> Betrag</label></div>
+        <div class="form-group"><label>Wert</label><input type="text" id="d-erh-wert" class="input"></div>
+        <div class="form-group"><label>Ab Monat</label><select id="d-erh-monat" class="input"></select></div>
+        <div class="form-group"><label>Bemerkung</label><input type="text" id="d-erh-bem" class="input"></div>
+        <div class="dialog-actions"><button class="btn btn-secondary" onclick="this.closest('dialog').close()">Abbrechen</button><button class="btn btn-primary" onclick="erhoehungOk()">Übernehmen</button></div>
+    </div></dialog>
+    <dialog id="dlg-std"><div class="dialog-content"><h2>Stundenanpassung</h2>
+        <div class="form-group"><label>Neue VK</label><input type="text" id="d-std-vk" class="input"></div>
+        <div class="form-group"><label>Ab Monat</label><select id="d-std-monat" class="input"></select></div>
+        <div class="form-group"><label>Bemerkung</label><input type="text" id="d-std-bem" class="input"></div>
+        <div class="dialog-actions"><button class="btn btn-secondary" onclick="this.closest('dialog').close()">Abbrechen</button><button class="btn btn-primary" onclick="stundenanpassungOk()">Übernehmen</button></div>
+    </div></dialog>
+    <dialog id="dlg-abw"><div class="dialog-content"><h2>Abwesenheit</h2>
+        <div class="form-group"><label>Grund</label><select id="d-abw-grund" class="input"><option>Elternzeit</option><option>Sonderurlaub</option><option>Krankheit ohne Lohnfortzahlung</option><option>Unbezahlter Urlaub</option><option>Sonstiges</option></select></div>
+        <div class="form-group"><label>Von</label><input type="date" id="d-abw-von" class="input"></div>
+        <div class="form-group"><label>Bis</label><input type="date" id="d-abw-bis" class="input"></div>
+        <div class="form-group"><label>Bemerkung</label><input type="text" id="d-abw-bem" class="input"></div>
+        <div class="dialog-actions"><button class="btn btn-secondary" onclick="this.closest('dialog').close()">Abbrechen</button><button class="btn btn-primary" onclick="abwesenheitOk()">Übernehmen</button></div>
+    </div></dialog>
+    <dialog id="dlg-szenario"><div class="dialog-content" style="max-width:720px">
+        <h2>Szenarien</h2>
+        <div class="text-muted" style="margin-bottom:8px">Hinweis: Szenarien 1..n blenden IST-Daten aus (wie in der EXE).</div>
+        <div id="sz-list" class="sz-list"></div>
+        <div class="form-row mt-2" style="gap:10px">
+            <input type="text" id="sz-name" class="input" placeholder="Neues Szenario (Name)">
+            <button class="btn btn-sm btn-primary" onclick="szAdd()">+</button>
+        </div>
+        <div class="dialog-actions" style="justify-content:space-between">
+            <button class="btn btn-secondary" onclick="this.closest('dialog').close()">Schließen</button>
+            <button class="btn btn-primary" onclick="szSaveToProject()">Im Projekt speichern</button>
+        </div>
+    </div></dialog>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/calc.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/export.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        var pid = new URLSearchParams(window.location.search).get('id');
+        if (pid) { initDB(SUPABASE_URL, SUPABASE_KEY); initProjekt(pid); }
+        else { window.location.href = 'index.html'; }
+    </script>
 </body>
 </html>

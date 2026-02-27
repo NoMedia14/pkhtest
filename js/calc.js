@@ -20,7 +20,12 @@ function neuesProjekt() {
     return { name:"Neues Projekt", jahr:new Date().getFullYear(),
         sv:{"KV":7.3,"Zusatzbeitrag KV":0.7,"RV":9.3,"AV":1.3,"PV":1.7,"Insolvenzumlage":0.06,"U1":1.6,"U2":0.44},
         tarife:{}, dienstarten:{}, kostenstellen:{}, entgelttabelle:{}, sonderzahlung:{},
-        sz_monat:11, sz_prozent:90.0, tariferhoehungen:[], mitarbeiter:[] };
+        sz_monat:11, sz_prozent:90.0, tariferhoehungen:[],
+        // Szenarien wie in der EXE (Szenario 0 = Ist-Stand)
+        szenarien:[],
+        // optionaler Änderungs-/System-Log wie in der EXE
+        log:[],
+        mitarbeiter:[] };
 }
 function neuerMa() {
     return { pnr:"",titel:"",vorname:"",nachname:"",eg:"",stufe:"",brutto:0,tarif:"",da:"",kst:"",vk:1.0,
