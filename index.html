@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PKR – Personalkostenhochrechnung</title>
-    <link rel="stylesheet" href="css/style.css?v=20260227_2">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-brand"><span>PKR – Personalkostenhochrechnung</span></div>
-        <div class="nav-version">v4.0</div>
+        <div class="nav-version">v4.0</div><div style="font-size:12px;opacity:.7;margin-top:4px;">build 2026-02-27_diag1</div>
     </nav>
     <main class="container">
         <div class="page-header">
@@ -28,10 +28,10 @@
         </div></dialog>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/config.js?v=20260227_2"></script>
-    <script src="js/calc.js?v=20260227_2"></script>
-    <script src="js/db.js?v=20260227_2"></script>
-    <script src="js/app.js?v=20260227_2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/calc.js"></script>
+    <script src="js/db.js"></script>
+    <script src="js/app.js"></script>
     <script>
         document.getElementById('inp-jahr').value = new Date().getFullYear();
         initDB(SUPABASE_URL, SUPABASE_KEY);

@@ -1,3 +1,4 @@
+window.PKR_BUILD = '2026-02-27_diag1';
 /* PKR Webapp – UI-Logik */
 var P = null, PID = null, SEL = null, chartVerlauf = null;
 
@@ -107,28 +108,23 @@ function maHinzufuegen() {
 }
 
 function maDuplizieren() {
-    if (SEL === null || !P || !P.mitarbeiter || !P.mitarbeiter[SEL]) { showToast('Mitarbeitende auswählen', 'error'); return; }
-    var src = P.mitarbeiter[SEL];
-    // Deep copy ohne interne Felder
-    var mc = JSON.parse(JSON.stringify(src));
-    delete mc._id; delete mc._berechnung; delete mc._jahresgesamt;
-
-    // Vermeidet Konflikte (z.B. Unique-Constraint auf PNR)
-    mc.pnr = '';
-    mc.vorname = mc.vorname || '';
-    mc.nachname = (mc.nachname || 'Neu') + ' (Kopie)';
-
-    dbMaSpeichern(PID, mc).then(function() {
-        return ladeProjekt();
-    }).then(function() {
-        // Letzten Eintrag auswählen
-        SEL = (P.mitarbeiter && P.mitarbeiter.length) ? (P.mitarbeiter.length - 1) : null;
-        if (SEL !== null) selectMa(SEL);
-        showToast('Dupliziert');
-    }).catch(function(err){
-        console.error(err);
-        showToast('Duplizieren fehlgeschlagen', 'error');
-    });
+  if (SEL === null || !P || !P.mitarbeiter || !P.mitarbeiter[SEL]) { showToast('Mitarbeitende auswählen', 'error'); return; }
+  var src = P.mitarbeiter[SEL];
+  var mc = JSON.parse(JSON.stringify(src));
+  delete mc._id; delete mc._berechnung; delete mc._jahresgesamt;
+  // Sicherheit: PNR leeren (verhindert Unique-Konflikte)
+  mc.pnr = '';
+  mc.nachname = (mc.nachname || 'Neu') + ' (Kopie)';
+  dbMaSpeichern(PID, mc).then(function(){
+    return ladeProjekt();
+  }).then(function(){
+    SEL = (P.mitarbeiter && P.mitarbeiter.length) ? (P.mitarbeiter.length - 1) : null;
+    if (SEL !== null) selectMa(SEL);
+    showToast('Dupliziert');
+  }).catch(function(err){
+    console.error(err);
+    showToast('Duplizieren fehlgeschlagen', 'error');
+  });
 }
 function maLoeschen() {
     if(SEL===null)return;var ma=P.mitarbeiter[SEL];
@@ -320,3 +316,17 @@ function csvImport(typ) {
         Promise.all(promises).then(function(){showToast(count+' importiert');ladeProjekt();});
     });
 }
+
+// ---- Diagnostics: global error handlers
+window.addEventListener('error', function(e){
+  try {
+    console.error('PKR error:', e.error || e.message);
+    if (typeof showToast === 'function') showToast('JS-Fehler: ' + (e.message || 'unknown'), 'error');
+  } catch(_) {}
+});
+window.addEventListener('unhandledrejection', function(e){
+  try {
+    console.error('PKR promise rejection:', e.reason);
+    if (typeof showToast === 'function') showToast('Promise-Fehler: ' + (e.reason && e.reason.message ? e.reason.message : 'unknown'), 'error');
+  } catch(_) {}
+});
