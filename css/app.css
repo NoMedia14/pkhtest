@@ -92,6 +92,6 @@ dialog .dialog-content{padding:20px}dialog h2{margin-bottom:12px;font-size:16px}
 .dialog-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
 
 /* Resizable panel divider */
-.lp{resize:horizontal;overflow:auto}
+
 .resize-handle{width:5px;background:#bdc3c7;cursor:col-resize;flex-shrink:0}
 .resize-handle:hover{background:#3b5998}
