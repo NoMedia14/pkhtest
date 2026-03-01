@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html lang="de">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PKR</title><link rel="stylesheet" href="css/app.css"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PKH – Personalkostenhochrechnung</title><link rel="stylesheet" href="css/app.css"></head>
 <body>
 <nav class="menubar">
  <div class="mi" tabindex="0"><span>Datei</span><div class="mdd"><a href="index.html">Projektübersicht</a><a onclick="projektSpeichern()">Projekt speichern <kbd>Strg+S</kbd></a><div class="msep"></div><a onclick="csvDlg('ma')">CSV importieren (Mitarbeiter)</a><a onclick="csvDlg('ist')">CSV importieren (IST-Daten)</a></div></div>
  <div class="mi" tabindex="0"><span>Einstellungen</span><div class="mdd"><a onclick="dlgProjSet()">Projekteinstellungen</a><div class="msep"></div><a onclick="dlgSV()">Sozialversicherungsbeiträge</a><a onclick="dlgTarife()">Tarife</a><a onclick="dlgDA()">Dienstarten verwalten</a><a onclick="dlgKST()">Kostenstellen verwalten</a><div class="msep"></div><a onclick="dlgET()">Entgelttabelle</a><a onclick="dlgSZG()">Jahressonderzahlung</a><a onclick="dlgTE()">Tariferhöhungen</a></div></div>
  <div class="mi" tabindex="0"><span>Berichtswesen</span><div class="mdd"><a onclick="acOpen()">Analysecenter</a></div></div>
  <div class="mi" tabindex="0" onclick="szOpen()"><span>Szenariovergleich</span></div>
- <div class="mr"><span id="nav-title" class="nt">PKR</span><span id="save-ind" class="si"></span></div>
+ <div class="mr"><span id="nav-title" class="nt">PKH</span><span id="save-ind" class="si"></span></div>
 </nav>
-<div class="app-layout">
+<div class="app-layout" id="app-layout">
  <div class="lp">
   <div class="lpt">Mitarbeiter</div>
   <div class="sr"><label>Suche:</label><input type="text" id="ma-q" class="inp sm" oninput="filt()"><label>DA:</label><select id="f-da" class="inp sm" onchange="filt()"><option value="">Alle</option></select><label>KSt:</label><select id="f-kst" class="inp sm" onchange="filt()"><option value="">Alle</option></select></div>
