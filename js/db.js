@@ -11,7 +11,7 @@ function dbProjektListe() {
 
 function dbProjektErstellen(name, jahr) {
     var p = neuesProjekt(); p.name = name; p.jahr = jahr || p.jahr;
-    var einst = { sv:p.sv, tarife:p.tarife, dienstarten:p.dienstarten, kostenstellen:p.kostenstellen, entgelttabelle:p.entgelttabelle, sonderzahlung:p.sonderzahlung||{}, sz_monat:p.sz_monat, sz_prozent:p.sz_prozent, tariferhoehungen:p.tariferhoehungen, szenarien:p.szenarien||[], log:p.log||[] };
+    var einst = { sv:p.sv, tarife:p.tarife, dienstarten:p.dienstarten, kostenstellen:p.kostenstellen, entgelttabelle:p.entgelttabelle, sonderzahlung:p.sonderzahlung||{}, sz_monat:p.sz_monat, sz_prozent:p.sz_prozent, tariferhoehungen:p.tariferhoehungen };
     return _sb.from('projekte').insert({ name:p.name, jahr:p.jahr, einstellungen:einst }).select().single().then(function(r) { return r.error ? null : r.data; });
 }
 
@@ -21,7 +21,7 @@ function dbProjektLaden(id) {
         var pd = pr.data, einst = pd.einstellungen || {};
         var p = neuesProjekt();
         p.name = pd.name; p.jahr = pd.jahr; p._id = pd.id;
-        ['sv','tarife','dienstarten','kostenstellen','entgelttabelle','sonderzahlung','sz_monat','sz_prozent','tariferhoehungen','szenarien','log'].forEach(function(k) { if (einst[k] !== undefined) p[k] = einst[k]; });
+        ['sv','tarife','dienstarten','kostenstellen','entgelttabelle','sonderzahlung','sz_monat','sz_prozent','tariferhoehungen'].forEach(function(k) { if (einst[k] !== undefined) p[k] = einst[k]; });
         return _sb.from('mitarbeiter').select('*').eq('projekt_id', id).order('nachname').then(function(mr) {
             (mr.data || []).forEach(function(r) {
                 var anp = r.anpassungen || [];
@@ -45,7 +45,7 @@ function dbProjektLaden(id) {
 
 function dbProjektSpeichern(p) {
     var einst = {};
-    ['sv','tarife','dienstarten','kostenstellen','entgelttabelle','sonderzahlung','sz_monat','sz_prozent','tariferhoehungen','szenarien','log'].forEach(function(k) { einst[k] = p[k]; });
+    ['sv','tarife','dienstarten','kostenstellen','entgelttabelle','sonderzahlung','sz_monat','sz_prozent','tariferhoehungen'].forEach(function(k) { einst[k] = p[k]; });
     return _sb.from('projekte').update({ name:p.name, jahr:p.jahr, einstellungen:einst }).eq('id', p._id);
 }
 

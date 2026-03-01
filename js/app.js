@@ -1,332 +1,167 @@
-window.PKR_BUILD = '2026-02-27_diag1';
-/* PKR Webapp – UI-Logik */
-var P = null, PID = null, SEL = null, chartVerlauf = null;
+/* PKR Webapp app.js - 1:1 EXE Port */
+var P=null,PID=null,SEL=null,GRP="",ANSI=null,acChart=null;
+var MC=[{i:"name",l:"Name",w:150},{i:"pnr",l:"Personalnr.",w:80},{i:"eg",l:"Entgeltgruppe",w:80},{i:"stufe",l:"Stufe",w:45},{i:"tarif",l:"Tarif",w:55},{i:"da",l:"Dienstart",w:65},{i:"kst",l:"Kostenstelle",w:75},{i:"vk",l:"Vollkraft",w:55},{i:"std",l:"Stunden",w:55},{i:"brutto",l:"Brutto",w:85},{i:"gesamt",l:"Jahreskosten",w:95}];
+var MV={name:1,pnr:1,eg:1,stufe:1,tarif:1,da:1,kst:1,vk:1,std:0,brutto:0,gesamt:1};
+function toast(m,t){var e=document.createElement("div");e.className="toast"+(t==="error"?" err":"");e.textContent=m;document.body.appendChild(e);setTimeout(function(){e.classList.add("show")},10);setTimeout(function(){e.classList.remove("show");setTimeout(function(){e.remove()},300)},2500)}
 
-function showToast(msg, type) {
-    var t = document.createElement('div');
-    t.className = 'toast' + (type === 'error' ? ' toast-error' : '');
-    t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(function(){t.classList.add('show');}, 10);
-    setTimeout(function(){t.classList.remove('show');setTimeout(function(){t.remove();},300);}, 2500);
-}
+/* Startseite */
+function ladeStartseite(){dbProjektListe().then(function(l){var el=document.getElementById("projekte-liste");if(!el)return;if(!l.length){el.innerHTML='<div class="empty-state">Noch keine Projekte.</div>';return}el.innerHTML=l.map(function(p){return '<a href="projekt.html?id='+p.id+'" class="project-card"><div style="display:flex;justify-content:space-between;align-items:center"><h3>'+p.name+'</h3><span class="badge">'+p.jahr+'</span></div><div class="project-card-footer"><span class="text-muted">'+new Date(p.updated_at).toLocaleDateString("de-DE")+'</span><button class="btn-danger-ghost" onclick="event.preventDefault();pDel(\''+p.id+"','"+p.name+"')\">x</button></div></a>"}).join("")})}
+function dlgNeuesProjekt(){document.getElementById("dlg-neu").showModal()}
+function projektErstellen(){var n=document.getElementById("inp-name").value||"Neues Projekt",j=parseInt(document.getElementById("inp-jahr").value)||new Date().getFullYear();dbProjektErstellen(n,j).then(function(p){document.getElementById("dlg-neu").close();if(p)location.href="projekt.html?id="+p.id})}
+function pDel(id,n){if(!confirm('Projekt "'+n+'" wirklich loeschen?'))return;dbProjektLoeschen(id).then(ladeStartseite)}
 
-// ─── Startseite ────────────────────────────────────────────────────
-function ladeStartseite() {
-    dbProjektListe().then(function(liste) {
-        var el = document.getElementById('projekte-liste');
-        if (!el) return;
-        if (!liste.length) { el.innerHTML = '<div class="empty-state"><p>Noch keine Projekte.</p></div>'; return; }
-        el.innerHTML = liste.map(function(p) {
-            return '<a href="projekt.html?id=' + p.id + '" class="project-card">' +
-                '<div class="project-card-header"><h3>' + p.name + '</h3><span class="badge">' + p.jahr + '</span></div>' +
-                '<div class="project-card-footer"><span class="text-muted">' + new Date(p.updated_at).toLocaleDateString('de-DE') + '</span>' +
-                '<button class="btn btn-icon btn-danger-ghost" onclick="event.preventDefault();projektLoeschen(\'' + p.id + '\',\'' + p.name + '\')" title="Löschen">✕</button></div></a>';
-        }).join('');
-    });
-}
-function dlgNeuesProjekt() { document.getElementById('dlg-neu').showModal(); }
-function projektErstellen() {
-    var name = document.getElementById('inp-name').value || 'Neues Projekt';
-    var jahr = parseInt(document.getElementById('inp-jahr').value) || new Date().getFullYear();
-    dbProjektErstellen(name, jahr).then(function(p) {
-        document.getElementById('dlg-neu').close();
-        if (p) window.location.href = 'projekt.html?id=' + p.id;
-    });
-}
-function projektLoeschen(id, name) {
-    if (!confirm('Projekt "' + name + '" wirklich löschen?')) return;
-    dbProjektLoeschen(id).then(function() { ladeStartseite(); });
-}
+/* Projekt */
+function initProjekt(pid){PID=pid;ladeProjekt()}
+function ladeProjekt(){dbProjektLaden(PID).then(function(p){if(!p){toast("Projekt nicht gefunden","error");return}P=p;recalc();document.getElementById("nav-title").textContent="Personalkostenhochrechnung v4.0 \u2013 "+P.name+" ("+P.jahr+")";document.getElementById("gk").textContent="Gesamtkosten alle Mitarbeiter: "+fmtEur(P._gk);buildML();fillFilt();if(SEL!==null&&P.mitarbeiter[SEL])selMa(SEL)})}
+function recalc(){P.mitarbeiter.forEach(function(ma){ma._b=berechne(ma,P);ma._j=ma._b.reduce(function(s,r){return s+r.g},0)});P._gk=P.mitarbeiter.reduce(function(s,m){return s+(m._j||0)},0)}
+function projektSpeichern(){document.getElementById("save-ind").textContent="Speichere...";if(SEL!==null)ssSilent();var pr=[];P.mitarbeiter.forEach(function(ma){pr.push(dbMaSpeichern(PID,ma))});Promise.all(pr).then(function(){return dbProjektSpeichern(P)}).then(function(){document.getElementById("save-ind").textContent="\u2714 Gespeichert";setTimeout(function(){document.getElementById("save-ind").textContent=""},2000);toast("Projekt gespeichert")})}
 
-// ─── Projekt ───────────────────────────────────────────────────────
-function initProjekt(pid) { PID = pid; ladeProjekt(); }
-function ladeProjekt() {
-    dbProjektLaden(PID).then(function(p) {
-        if (!p) { showToast('Projekt nicht gefunden', 'error'); return; }
-        P = p;
-        P.mitarbeiter.forEach(function(ma) {
-            ma._berechnung = berechne(ma, P);
-            ma._jahresgesamt = ma._berechnung.reduce(function(s,r){return s+r.g;}, 0);
-        });
-        P._gesamtkosten = P.mitarbeiter.reduce(function(s,m){return s+(m._jahresgesamt||0);}, 0);
-        document.getElementById('nav-title').textContent = P.name + ' (' + P.jahr + ')';
-        document.getElementById('gesamtkosten').textContent = 'Gesamtkosten: ' + fmtEur(P._gesamtkosten);
-        buildMaListe(); fillFilters(); fillEinstellungen();
-        if (SEL !== null && P.mitarbeiter[SEL]) selectMa(SEL);
-    });
-}
-function projektSpeichern() {
-    document.getElementById('save-indicator').textContent = 'Speichere...';
-    einstellungenSpeichern(true).then(function() {
-        document.getElementById('save-indicator').textContent = '✔ Gespeichert';
-        setTimeout(function(){document.getElementById('save-indicator').textContent='';}, 2000);
-    });
-}
+/* Tabs */
+function swTab(n,btn){document.querySelectorAll(".tb").forEach(function(b){b.classList.remove("active")});if(btn)btn.classList.add("active");document.querySelectorAll(".tp").forEach(function(t){t.classList.toggle("active",t.id==="tab-"+n)})}
 
-// ─── Tabs ──────────────────────────────────────────────────────────
-function switchTab(name) {
-    document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t.dataset.tab===name);});
-    document.querySelectorAll('.tab-content').forEach(function(t){t.classList.toggle('active',t.id==='tab-'+name);});
-    if (name === 'analyse') ladeAnalyse();
-}
+/* MA Liste */
+function mcv(ma,id){switch(id){case"name":return maName(ma);case"pnr":return ma.pnr||"";case"eg":return ma.eg||"";case"stufe":return ma.stufe||"";case"tarif":return ma.tarif||"";case"da":return(ma.da||"")+(daBezeichnung(P,ma.da)?" "+daBezeichnung(P,ma.da):"");case"kst":return(ma.kst||"")+(kstBezeichnung(P,ma.kst)?" "+kstBezeichnung(P,ma.kst):"");case"vk":return(ma.vk||1).toFixed(2);case"std":var ts=tarifStunden(P,ma.tarif);return ts>0?(ts*(ma.vk||1)).toFixed(1):"\u2013";case"brutto":return fmtEur(ma.brutto||0);case"gesamt":return fmtEur(ma._j||0);default:return""}}
+function buildML(){var vc=MC.filter(function(c){return MV[c.i]});document.getElementById("mth").innerHTML="<tr>"+vc.map(function(c){return '<th style="width:'+c.w+'px">'+c.l+"</th>"}).join("")+"</tr>";var tb=document.getElementById("mtb");if(!P||!P.mitarbeiter.length){tb.innerHTML='<tr><td colspan="'+vc.length+'" style="text-align:center;color:#888;padding:20px">Keine Mitarbeiter</td></tr>';return}var h="";if(GRP){var g={};P.mitarbeiter.forEach(function(ma,i){var k=String(ma[GRP]||"")||"(Keine)";if(!g[k])g[k]=[];g[k].push(i)});Object.keys(g).sort().forEach(function(k){var bz=GRP==="da"?daBezeichnung(P,k):kstBezeichnung(P,k);h+='<tr class="gh"><td colspan="'+vc.length+'">'+k+(bz?" \u2013 "+bz:"")+"</td></tr>";g[k].forEach(function(i){var ma=P.mitarbeiter[i];h+='<tr class="'+(i===SEL?"sel":"")+'" onclick="selMa('+i+')" data-i="'+i+'" data-da="'+(ma.da||"")+'" data-kst="'+(ma.kst||"")+'">'+vc.map(function(c){return"<td>"+mcv(ma,c.i)+"</td>"}).join("")+"</tr>"})})}else{P.mitarbeiter.forEach(function(ma,i){h+='<tr class="'+(i===SEL?"sel":"")+'" onclick="selMa('+i+')" data-i="'+i+'" data-da="'+(ma.da||"")+'" data-kst="'+(ma.kst||"")+'">'+vc.map(function(c){return"<td>"+mcv(ma,c.i)+"</td>"}).join("")+"</tr>"})}tb.innerHTML=h}
+function filt(){var q=document.getElementById("ma-q").value.toLowerCase(),fd=document.getElementById("f-da").value,fk=document.getElementById("f-kst").value;document.querySelectorAll("#mtb tr[data-i]").forEach(function(r){r.style.display=(!q||r.textContent.toLowerCase().indexOf(q)>=0)&&(!fd||r.dataset.da===fd)&&(!fk||r.dataset.kst===fk)?"":"none"})}
+function fillFilt(){var d={},k={};P.mitarbeiter.forEach(function(m){if(m.da)d[m.da]=1;if(m.kst)k[m.kst]=1});document.getElementById("f-da").innerHTML='<option value="">Alle</option>'+Object.keys(d).sort().map(function(v){return'<option value="'+v+'">'+v+(daBezeichnung(P,v)?" - "+daBezeichnung(P,v):"")+"</option>"}).join("");document.getElementById("f-kst").innerHTML='<option value="">Alle</option>'+Object.keys(k).sort().map(function(v){return'<option value="'+v+'">'+v+(kstBezeichnung(P,v)?" - "+kstBezeichnung(P,v):"")+"</option>"}).join("")}
+function setGrp(g){GRP=g;buildML()}
+function maAll(){if(P&&P.mitarbeiter.length&&SEL===null)selMa(0)}
+function maAdd(){var ma=neuerMa();ma.nachname="Mitarbeiter";ma.vorname=String((P?P.mitarbeiter.length:0)+1);dbMaSpeichern(PID,ma).then(function(){ladeProjekt();toast("Hinzugefuegt")})}
+function maDel(){if(SEL===null)return;if(!confirm('"'+maName(P.mitarbeiter[SEL])+'" entfernen?'))return;dbMaLoeschen(P.mitarbeiter[SEL]._id).then(function(){SEL=null;hideS();ladeProjekt();toast("Entfernt")})}
+function maDup(){if(SEL===null)return;var c=JSON.parse(JSON.stringify(P.mitarbeiter[SEL]));delete c._id;delete c._b;delete c._j;c.nachname+=" (Kopie)";dbMaSpeichern(PID,c).then(function(){ladeProjekt();toast("Dupliziert")})}
+function hideS(){document.getElementById("sf").style.display="none";document.getElementById("se").style.display="";document.getElementById("pc").style.display="none";document.getElementById("pe").style.display=""}
 
-// ─── Mitarbeiterliste ──────────────────────────────────────────────
-function buildMaListe() {
-    var el = document.getElementById('ma-liste');
-    if (!P||!P.mitarbeiter.length) { el.innerHTML='<div class="empty-state" style="padding:20px"><small>Keine Mitarbeiter</small></div>'; return; }
-    el.innerHTML = P.mitarbeiter.map(function(ma, i) {
-        var name = maName(ma);
-        var parts = [];
-        if (ma.pnr) parts.push(ma.pnr);
-        if (ma.da) parts.push(ma.da + (daBezeichnung(P,ma.da)?' '+daBezeichnung(P,ma.da):''));
-        if (ma.kst) parts.push(ma.kst + (kstBezeichnung(P,ma.kst)?' '+kstBezeichnung(P,ma.kst):''));
-        parts.push(fmtEur(ma._jahresgesamt));
-        return '<div class="ma-item'+(i===SEL?' active':'')+'" onclick="selectMa('+i+')" data-da="'+(ma.da||'')+'" data-kst="'+(ma.kst||'')+'">' +
-            '<div class="ma-item-name">'+name+'</div><div class="ma-item-sub">'+parts.join(' · ')+'</div></div>';
-    }).join('');
-}
-function filterListe() {
-    var q=document.getElementById('ma-suche').value.toLowerCase();
-    var fda=document.getElementById('filter-da').value, fkst=document.getElementById('filter-kst').value;
-    document.querySelectorAll('.ma-item').forEach(function(el){
-        el.style.display=(!q||el.textContent.toLowerCase().indexOf(q)>=0)&&(!fda||el.dataset.da===fda)&&(!fkst||el.dataset.kst===fkst)?'':'none';
-    });
-}
-function fillFilters() {
-    var das={},ksts={};P.mitarbeiter.forEach(function(m){if(m.da)das[m.da]=1;if(m.kst)ksts[m.kst]=1;});
-    document.getElementById('filter-da').innerHTML='<option value="">Alle DA</option>'+Object.keys(das).sort().map(function(d){return '<option value="'+d+'">'+d+(daBezeichnung(P,d)?' - '+daBezeichnung(P,d):'')+'</option>';}).join('');
-    document.getElementById('filter-kst').innerHTML='<option value="">Alle KSt</option>'+Object.keys(ksts).sort().map(function(k){return '<option value="'+k+'">'+k+(kstBezeichnung(P,k)?' - '+kstBezeichnung(P,k):'')+'</option>';}).join('');
-}
+/* Selektion & Stammdaten */
+function selMa(i){SEL=i;var ma=P.mitarbeiter[i];if(!ma)return;document.querySelectorAll("#mtb tr").forEach(function(r){r.classList.toggle("sel",r.dataset&&r.dataset.i==String(i))});document.getElementById("se").style.display="none";document.getElementById("sf").style.display="";document.getElementById("pe").style.display="none";document.getElementById("pc").style.display="";["pnr","titel","nachname","vorname"].forEach(function(k){document.getElementById("s-"+k).value=ma[k]||""});document.getElementById("s-brutto").value=String(ma.brutto||0);document.getElementById("s-vk").value=String(ma.vk||1.0);document.getElementById("s-ein").value=datumAnzeige(ma.eintritt);document.getElementById("s-aus").value=datumAnzeige(ma.austritt);document.getElementById("s-bem").value=ma.bemerkung||"";fillDD(ma);anpR(ma);ergR()}
+function fillDD(ma){document.getElementById("s-tarif").innerHTML='<option value="">\u2013</option>'+Object.keys(P.tarife||{}).map(function(t){return'<option value="'+t+'"'+(t===ma.tarif?" selected":"")+">"+t+"</option>"}).join("");document.getElementById("s-da").innerHTML='<option value="">\u2013</option>'+Object.entries(P.dienstarten||{}).sort(function(a,b){return a[0].localeCompare(b[0])}).map(function(e){return'<option value="'+e[0]+'"'+(e[0]===ma.da?" selected":"")+">"+e[0]+" - "+(e[1].bezeichnung||"")+"</option>"}).join("");document.getElementById("s-kst").innerHTML='<option value="">\u2013</option>'+Object.entries(P.kostenstellen||{}).sort(function(a,b){return a[0].localeCompare(b[0])}).map(function(e){return'<option value="'+e[0]+'"'+(e[0]===ma.kst?" selected":"")+">"+e[0]+" - "+(e[1].bezeichnung||"")+"</option>"}).join("");document.getElementById("s-eg").innerHTML='<option value="">\u2013</option>'+entgeltEgForTarif(P,ma.tarif).map(function(e){return'<option value="'+e+'"'+(e===ma.eg?" selected":"")+">"+e+"</option>"}).join("");document.getElementById("s-stufe").innerHTML='<option value="">\u2013</option>'+entgeltStufenForEg(P,ma.eg,ma.tarif).map(function(s){return'<option value="'+s+'"'+(s===ma.stufe?" selected":"")+">"+s+"</option>"}).join("");updWstd()}
+function onTarif(){var t=document.getElementById("s-tarif").value;document.getElementById("s-eg").innerHTML='<option value="">\u2013</option>'+entgeltEgForTarif(P,t).map(function(e){return"<option>"+e+"</option>"}).join("");document.getElementById("s-stufe").innerHTML='<option value="">\u2013</option>';updWstd()}
+function onEg(){var t=document.getElementById("s-tarif").value,eg=document.getElementById("s-eg").value;document.getElementById("s-stufe").innerHTML='<option value="">\u2013</option>'+entgeltStufenForEg(P,eg,t).map(function(s){return"<option>"+s+"</option>"}).join("")}
+function onStufe(){var t=document.getElementById("s-tarif").value,eg=document.getElementById("s-eg").value,st=document.getElementById("s-stufe").value;if(eg&&st){var b=entgelt(P,eg,st,t);if(b!==null)document.getElementById("s-brutto").value=b.toFixed(2)}}
+function updWstd(){var t=document.getElementById("s-tarif").value,vk=parseNum(document.getElementById("s-vk").value),ts=(P.tarife||{})[t]?((P.tarife||{})[t].stunden||0):0;if(ts>0){document.getElementById("s-wstd").value=(ts*vk).toFixed(1);document.getElementById("s-winfo").textContent="Tarifstunden: "+ts+"h | Wochenstunden: "+(ts*vk).toFixed(1)+"h"}else{document.getElementById("s-wstd").value="\u2013";document.getElementById("s-winfo").textContent="Tarifstunden: -"}}
+function bruttoET(){var b=entgelt(P,document.getElementById("s-eg").value,document.getElementById("s-stufe").value,document.getElementById("s-tarif").value);if(b!==null)document.getElementById("s-brutto").value=b.toFixed(2);else toast("Kein Eintrag in Entgelttabelle","error")}
+function ssSilent(){if(SEL===null)return;var ma=P.mitarbeiter[SEL];ma.pnr=document.getElementById("s-pnr").value;ma.titel=document.getElementById("s-titel").value;ma.nachname=document.getElementById("s-nachname").value;ma.vorname=document.getElementById("s-vorname").value;ma.tarif=document.getElementById("s-tarif").value;ma.eg=document.getElementById("s-eg").value;ma.stufe=document.getElementById("s-stufe").value;ma.brutto=parseNum(document.getElementById("s-brutto").value);ma.vk=parseNum(document.getElementById("s-vk").value);ma.da=(document.getElementById("s-da").value||"").split(" - ")[0].trim();ma.kst=(document.getElementById("s-kst").value||"").split(" - ")[0].trim();ma.eintritt=datumIso(document.getElementById("s-ein").value)||null;ma.austritt=datumIso(document.getElementById("s-aus").value)||null;ma.bemerkung=document.getElementById("s-bem").value}
+function stammSave(){if(SEL===null)return;ssSilent();var ma=P.mitarbeiter[SEL];dbMaSpeichern(PID,ma).then(function(){recalc();document.getElementById("gk").textContent="Gesamtkosten alle Mitarbeiter: "+fmtEur(P._gk);buildML();ergR();var b=document.getElementById("btn-ss");b.textContent="\u2714 Gespeichert";setTimeout(function(){b.textContent="Stammdaten speichern"},1500);toast("Gespeichert")})}
 
-// ─── MA CRUD ───────────────────────────────────────────────────────
-function maHinzufuegen() {
-    var ma=neuerMa();ma.nachname='Neu';
-    dbMaSpeichern(PID,ma).then(function(){ladeProjekt();}).then(function(){
-        SEL=P?P.mitarbeiter.length-1:0; if(P&&P.mitarbeiter[SEL])selectMa(SEL); showToast('Hinzugefügt');
-    });
-}
+/* Anpassungen */
+function anpR(ma){if(!ma&&SEL!==null)ma=P.mitarbeiter[SEL];if(!ma)return;var tb=document.getElementById("atb"),rows=[];
+(ma.stufenaufstiege||[]).forEach(function(x,i){rows.push({t:"Stufenaufstieg",d:"Stufe "+x.stufe+", "+fmtEur(x.brutto),ab:MONATE[(x.ab||1)-1],b:x.bem||"",k:"stufenaufstiege",x:i})});
+(ma.ind_erhoehungen||[]).forEach(function(x,i){rows.push({t:"Ind. Erhoehung",d:x.pz?"+"+x.pz+"%":"+"+fmtEur(x.bt||0),ab:MONATE[(x.ab||1)-1],b:x.bem||"",k:"ind_erhoehungen",x:i})});
+(ma.std_anpassungen||[]).forEach(function(x,i){var ts=tarifStunden(P,ma.tarif);rows.push({t:"Stundenanpassung",d:"VK "+(x.vk||0).toFixed(2)+(ts>0?" ("+(ts*x.vk).toFixed(1)+"h)":""),ab:MONATE[(x.ab||1)-1],b:x.bem||"",k:"std_anpassungen",x:i})});
+(ma.abwesenheiten||[]).forEach(function(x,i){rows.push({t:"Abwesenheit",d:(x.grund||"")+": "+datumAnzeige(x.von)+" \u2013 "+datumAnzeige(x.bis),ab:"",b:x.bem||"",k:"abwesenheiten",x:i})});
+var szo=ma.sz_override;if(szo){if(szo.deaktiviert)rows.push({t:"Jahressonderzahlung",d:"Deaktiviert",ab:"",b:szo.bem||"",k:"sz_override",x:0});else if(szo.manuell)rows.push({t:"Jahressonderzahlung",d:"Manuell: "+fmtEur(szo.betrag||0)+" im "+MONATE[(szo.monat||11)-1],ab:"",b:szo.bem||"",k:"sz_override",x:0})}
+ANSI=null;tb.innerHTML=rows.length?rows.map(function(r,ri){return '<tr onclick="anpSel('+ri+')" ondblclick="anpEdit('+ri+')" data-ri="'+ri+'"><td>'+r.t+"</td><td>"+r.d+"</td><td>"+r.ab+"</td><td>"+r.b+"</td></tr>"}).join(""):'<tr><td colspan="4" style="text-align:center;color:#888;padding:10px">Keine Anpassungen</td></tr>'}
+function anpSel(ri){ANSI=ri;document.querySelectorAll("#atb tr").forEach(function(r){r.classList.toggle("asel",r.dataset&&r.dataset.ri==String(ri))})}
+function anpDel(){if(SEL===null||ANSI===null)return;var ma=P.mitarbeiter[SEL],rows=[];(ma.stufenaufstiege||[]).forEach(function(x,i){rows.push({k:"stufenaufstiege",x:i})});(ma.ind_erhoehungen||[]).forEach(function(x,i){rows.push({k:"ind_erhoehungen",x:i})});(ma.std_anpassungen||[]).forEach(function(x,i){rows.push({k:"std_anpassungen",x:i})});(ma.abwesenheiten||[]).forEach(function(x,i){rows.push({k:"abwesenheiten",x:i})});if(ma.sz_override)rows.push({k:"sz_override",x:0});if(ANSI>=rows.length)return;var r=rows[ANSI];if(r.k==="sz_override")ma.sz_override=null;else ma[r.k].splice(r.x,1);anpSave()}
+function anpSave(){var ma=P.mitarbeiter[SEL];dbMaSpeichern(PID,ma).then(function(){recalc();document.getElementById("gk").textContent="Gesamtkosten alle Mitarbeiter: "+fmtEur(P._gk);anpR(ma);ergR();buildML();toast("Gespeichert")})}
+function anpEdit(ri){if(SEL===null)return;var ma=P.mitarbeiter[SEL],rows=[];(ma.stufenaufstiege||[]).forEach(function(x){rows.push({k:"stufenaufstiege",d:x})});(ma.ind_erhoehungen||[]).forEach(function(x){rows.push({k:"ind_erhoehungen",d:x})});(ma.std_anpassungen||[]).forEach(function(x){rows.push({k:"std_anpassungen",d:x})});(ma.abwesenheiten||[]).forEach(function(x){rows.push({k:"abwesenheiten",d:x})});if(ma.sz_override)rows.push({k:"sz_override",d:ma.sz_override});if(ri>=rows.length)return;var r=rows[ri];if(r.k==="stufenaufstiege")dlgStufe(r.d);else if(r.k==="ind_erhoehungen")dlgErh(r.d);else if(r.k==="std_anpassungen")dlgStd(r.d);else if(r.k==="abwesenheiten")dlgAbw(r.d);else dlgSzP()}
 
-function maDuplizieren() {
-  if (SEL === null || !P || !P.mitarbeiter || !P.mitarbeiter[SEL]) { showToast('Mitarbeitende auswählen', 'error'); return; }
-  var src = P.mitarbeiter[SEL];
-  var mc = JSON.parse(JSON.stringify(src));
-  delete mc._id; delete mc._berechnung; delete mc._jahresgesamt;
-  // Sicherheit: PNR leeren (verhindert Unique-Konflikte)
-  mc.pnr = '';
-  mc.nachname = (mc.nachname || 'Neu') + ' (Kopie)';
-  dbMaSpeichern(PID, mc).then(function(){
-    return ladeProjekt();
-  }).then(function(){
-    SEL = (P.mitarbeiter && P.mitarbeiter.length) ? (P.mitarbeiter.length - 1) : null;
-    if (SEL !== null) selectMa(SEL);
-    showToast('Dupliziert');
-  }).catch(function(err){
-    console.error(err);
-    showToast('Duplizieren fehlgeschlagen', 'error');
-  });
-}
-function maLoeschen() {
-    if(SEL===null)return;var ma=P.mitarbeiter[SEL];
-    if(!confirm('"'+maName(ma)+'" entfernen?'))return;
-    dbMaLoeschen(ma._id).then(function(){SEL=null;document.getElementById('stamm-form').style.display='none';document.getElementById('stamm-empty').style.display='';ladeProjekt();showToast('Entfernt');});
-}
+/* Hochrechnung */
+function ergR(){if(SEL===null)return;var ma=P.mitarbeiter[SEL];ssSilent();ma._b=berechne(ma,P);ma._j=ma._b.reduce(function(s,r){return s+r.g},0);var e=ma._b,vis=[{k:"mn",l:"Monat"}];if(document.getElementById("cv").checked)vis.push({k:"vk",l:"Vollkraft"});if(document.getElementById("cs").checked)vis.push({k:"std",l:"Stunden"});if(document.getElementById("ca").checked)vis.push({k:"a",l:"Anteil"});if(document.getElementById("cb").checked)vis.push({k:"b",l:"Brutto"});if(document.getElementById("csz").checked)vis.push({k:"sz",l:"Jahressonderzahlung"});if(document.getElementById("cag").checked)vis.push({k:"ag",l:"Arbeitgeberanteil"});if(document.getElementById("cg").checked)vis.push({k:"g",l:"Gesamt"});
+document.getElementById("eth").innerHTML="<tr>"+vis.map(function(c){return"<th>"+c.l+"</th>"}).join("")+"</tr>";var sm={b:0,sz:0,ag:0,g:0},ist=ma.ist_daten||{};
+document.getElementById("etb").innerHTML=e.map(function(x,i){sm.b+=x.b;sm.sz+=x.sz;sm.ag+=x.ag;sm.g+=x.g;var isI=!!ist[String(x.m)];return '<tr class="'+(isI?"ist":"")+'" ondblclick="ergDbl('+i+')">'+vis.map(function(c){if(c.k==="mn")return"<td>"+(isI?"[IST] ":"")+x.mn+"</td>";if(c.k==="vk")return"<td>"+(x.vk||0).toFixed(2)+"</td>";if(c.k==="std")return"<td>"+(x.std||0).toFixed(1)+"</td>";if(c.k==="a")return"<td>"+(x.a*100).toFixed(0)+"%</td>";return"<td>"+fmtEur(x[c.k])+"</td>"}).join("")+"</tr>"}).join("");
+document.getElementById("esum").textContent="Brutto: "+fmtEur(sm.b)+" | Jahressonderzahlung: "+fmtEur(sm.sz)+" | AG: "+fmtEur(sm.ag)+" | Gesamt: "+fmtEur(sm.g)}
+function ergDbl(idx){if(SEL===null||idx>=12)return;var m=idx+1,ma=P.mitarbeiter[SEL],cur=ma._b[idx],ap=agSatz(P),isM=!!(ma.ist_daten||{})[String(m)];var h='<div style="font-weight:bold;margin-bottom:8px">'+MONATE[m-1]+" \u2013 "+(isM?"Manueller Wert":"Berechnet")+"</div>";h+='<div class="fg"><label>Brutto:</label><input type="text" id="em-b" class="inp" value="'+cur.b.toFixed(2)+'" oninput="emC()"></div>';h+='<div class="fg"><label>AG-Anteil ('+ap.toFixed(2)+'%):</label><input type="text" id="em-ag" class="inp" value="'+cur.ag.toFixed(2)+'" oninput="emG()"></div>';h+='<div class="fg"><label>Sonderzahlung:</label><input type="text" id="em-sz" class="inp" value="'+cur.sz.toFixed(2)+'" oninput="emG()"></div>';h+='<div class="fg"><label>Gesamt:</label><input type="text" id="em-g" class="inp" value="'+cur.g.toFixed(2)+'" readonly></div>';h+='<label style="display:block;margin:8px 0"><input type="checkbox" id="em-f"> Fuer Folgemonate uebernehmen</label>';h+='<div class="da"><button class="be ba" onclick="emOk('+m+')">Uebernehmen</button><button class="be" onclick="emDel('+m+')">Wert entfernen</button><button class="be" onclick="emET('+m+')">Aus Entgelttabelle</button></div>';DO(MONATE[m-1]+" bearbeiten",h)}
+function emC(){var b=parseNum(document.getElementById("em-b").value),ag=b*agSatz(P)/100;document.getElementById("em-ag").value=ag.toFixed(2);emG()}
+function emG(){var b=parseNum(document.getElementById("em-b").value),ag=parseNum(document.getElementById("em-ag").value),sz=parseNum(document.getElementById("em-sz").value);document.getElementById("em-g").value=(b+ag+sz).toFixed(2)}
+function emOk(m){var b=parseNum(document.getElementById("em-b").value),ag=parseNum(document.getElementById("em-ag").value),sz=parseNum(document.getElementById("em-sz").value);var ma=P.mitarbeiter[SEL],ms=[m];if(document.getElementById("em-f").checked)for(var i=m;i<=12;i++)ms.push(i);ms.forEach(function(mm){ma.ist_daten=ma.ist_daten||{};ma.ist_daten[String(mm)]={brutto:b,ag:ag,sz:mm===m?sz:0,gesamt:mm===m?b+ag+sz:b+ag}});DC();anpSave()}
+function emDel(m){var ma=P.mitarbeiter[SEL];if(ma.ist_daten)delete ma.ist_daten[String(m)];DC();anpSave()}
+function emET(m){var ma=P.mitarbeiter[SEL],b=entgelt(P,ma.eg,ma.stufe,ma.tarif);if(b!==null){document.getElementById("em-b").value=b.toFixed(2);emC()}else toast("Kein Eintrag","error")}
+function rstIst(){if(SEL===null)return;var ma=P.mitarbeiter[SEL];if(!ma.ist_daten||!Object.keys(ma.ist_daten).length){toast("Keine manuellen Aenderungen","error");return}if(!confirm("Alle manuellen Monatsaenderungen zuruecksetzen?"))return;ma.ist_daten={};anpSave()}
 
-// ─── Stammdaten ────────────────────────────────────────────────────
-function selectMa(idx) {
-    SEL=idx; var ma=P.mitarbeiter[idx]; if(!ma)return;
-    document.querySelectorAll('.ma-item').forEach(function(el,i){el.classList.toggle('active',i===idx);});
-    document.getElementById('stamm-empty').style.display='none';
-    document.getElementById('stamm-form').style.display='';
-    ['pnr','titel','nachname','vorname','bemerkung'].forEach(function(k){var el=document.getElementById('s-'+k);if(el)el.value=ma[k]||'';});
-    document.getElementById('s-brutto').value=(ma.brutto||0).toFixed(2).replace('.',',');
-    document.getElementById('s-vk').value=String(ma.vk||1.0).replace('.',',');
-    document.getElementById('s-eintritt').value=ma.eintritt||'';
-    document.getElementById('s-austritt').value=ma.austritt||'';
-    fillStammDropdowns(ma); fillPlanung(ma); fillHochrechnung(ma);
-    document.getElementById('plan-empty').style.display='none';document.getElementById('plan-content').style.display='';
-    document.getElementById('hr-empty').style.display='none';document.getElementById('hr-content').style.display='';
-}
-function fillStammDropdowns(ma) {
-    document.getElementById('s-tarif').innerHTML='<option value="">–</option>'+Object.keys(P.tarife||{}).map(function(t){return '<option value="'+t+'"'+(t===ma.tarif?' selected':'')+'>'+t+'</option>';}).join('');
-    document.getElementById('s-da').innerHTML='<option value="">–</option>'+Object.entries(P.dienstarten||{}).sort(function(a,b){return a[0].localeCompare(b[0]);}).map(function(e){return '<option value="'+e[0]+'"'+(e[0]===ma.da?' selected':'')+'>'+e[0]+' - '+(e[1].bezeichnung||'')+'</option>';}).join('');
-    document.getElementById('s-kst').innerHTML='<option value="">–</option>'+Object.entries(P.kostenstellen||{}).sort(function(a,b){return a[0].localeCompare(b[0]);}).map(function(e){return '<option value="'+e[0]+'"'+(e[0]===ma.kst?' selected':'')+'>'+e[0]+' - '+(e[1].bezeichnung||'')+'</option>';}).join('');
-    var egs=entgeltEgForTarif(P,ma.tarif);
-    document.getElementById('s-eg').innerHTML='<option value="">–</option>'+egs.map(function(e){return '<option value="'+e+'"'+(e===ma.eg?' selected':'')+'>'+e+'</option>';}).join('');
-    var stufen=entgeltStufenForEg(P,ma.eg,ma.tarif);
-    document.getElementById('s-stufe').innerHTML='<option value="">–</option>'+stufen.map(function(s){return '<option value="'+s+'"'+(s===ma.stufe?' selected':'')+'>'+s+'</option>';}).join('');
-    updateWstd();
-}
-function onTarifChanged(){var t=document.getElementById('s-tarif').value;document.getElementById('s-eg').innerHTML='<option value="">–</option>'+entgeltEgForTarif(P,t).map(function(e){return '<option value="'+e+'">'+e+'</option>';}).join('');document.getElementById('s-stufe').innerHTML='<option value="">–</option>';updateWstd();}
-function onEgChanged(){var t=document.getElementById('s-tarif').value,eg=document.getElementById('s-eg').value;document.getElementById('s-stufe').innerHTML='<option value="">–</option>'+entgeltStufenForEg(P,eg,t).map(function(s){return '<option value="'+s+'">'+s+'</option>';}).join('');}
-function onStufeChanged(){var t=document.getElementById('s-tarif').value,eg=document.getElementById('s-eg').value,st=document.getElementById('s-stufe').value;if(eg&&st){var b=entgelt(P,eg,st,t);if(b!==null)document.getElementById('s-brutto').value=b.toFixed(2).replace('.',',');}}
-function updateWstd(){var t=document.getElementById('s-tarif').value,vk=parseNum(document.getElementById('s-vk').value),ts=(P.tarife||{})[t]?((P.tarife||{})[t].stunden||0):0;document.getElementById('s-wstd').textContent=ts>0?(ts*vk).toFixed(1)+'h (Tarif: '+ts+'h)':'–';}
-function stammSpeichern() {
-    if(SEL===null)return;var ma=P.mitarbeiter[SEL];
-    ma.pnr=document.getElementById('s-pnr').value;ma.titel=document.getElementById('s-titel').value;
-    ma.nachname=document.getElementById('s-nachname').value;ma.vorname=document.getElementById('s-vorname').value;
-    ma.tarif=document.getElementById('s-tarif').value;ma.eg=document.getElementById('s-eg').value;ma.stufe=document.getElementById('s-stufe').value;
-    ma.brutto=parseNum(document.getElementById('s-brutto').value);ma.vk=parseNum(document.getElementById('s-vk').value);
-    ma.da=document.getElementById('s-da').value;ma.kst=document.getElementById('s-kst').value;
-    ma.eintritt=document.getElementById('s-eintritt').value||null;ma.austritt=document.getElementById('s-austritt').value||null;
-    ma.bemerkung=document.getElementById('s-bemerkung').value;
-    dbMaSpeichern(PID,ma).then(function(){
-        ma._berechnung=berechne(ma,P);ma._jahresgesamt=ma._berechnung.reduce(function(s,r){return s+r.g;},0);
-        P._gesamtkosten=P.mitarbeiter.reduce(function(s,m){return s+(m._jahresgesamt||0);},0);
-        document.getElementById('gesamtkosten').textContent='Gesamtkosten: '+fmtEur(P._gesamtkosten);
-        buildMaListe();fillHochrechnung(ma);showToast('Gespeichert');
-    });
-}
+/* Dialog-Helpers */
+function DO(t,h){document.getElementById("dov").style.display="";document.getElementById("dbox").style.display="flex";document.getElementById("dtit").textContent=t;document.getElementById("dbod").innerHTML=h}
+function DC(){document.getElementById("dov").style.display="none";document.getElementById("dbox").style.display="none"}
+function moO(s){return MONATE.map(function(m,i){return'<option value="'+(i+1)+'"'+((i+1)===s?" selected":"")+">"+m+"</option>"}).join("")}
 
-// ─── Planung ───────────────────────────────────────────────────────
-function fillPlanung(ma) {
-    var tbody=document.querySelector('#tbl-anpassungen tbody'),rows=[];
-    (ma.stufenaufstiege||[]).forEach(function(x,i){rows.push({typ:'Stufenaufstieg',detail:'EG '+x.eg+' Stufe '+x.stufe+' → '+fmtEur(x.brutto),ab:x.ab,bem:x.bem||'',key:'stufenaufstiege',idx:i});});
-    (ma.ind_erhoehungen||[]).forEach(function(x,i){rows.push({typ:'Erhöhung',detail:x.pz?x.pz+'%':fmtEur(x.bt),ab:x.ab,bem:x.bem||'',key:'ind_erhoehungen',idx:i});});
-    (ma.std_anpassungen||[]).forEach(function(x,i){rows.push({typ:'Stundenanpassung',detail:'VK: '+x.vk,ab:x.ab,bem:x.bem||'',key:'std_anpassungen',idx:i});});
-    (ma.abwesenheiten||[]).forEach(function(x,i){rows.push({typ:'Abwesenheit',detail:x.grund+' ('+datumAnzeige(x.von)+' – '+datumAnzeige(x.bis)+')',ab:'',bem:x.bem||'',key:'abwesenheiten',idx:i});});
-    tbody.innerHTML=rows.length?rows.map(function(r){return '<tr><td>'+r.typ+'</td><td>'+r.detail+'</td><td>'+(r.ab?MONATE[r.ab-1]:'–')+'</td><td>'+r.bem+'</td><td><button class="btn-del-row" onclick="anpDel(\''+r.key+'\','+r.idx+')">×</button></td></tr>';}).join(''):'<tr><td colspan="5" class="text-muted" style="text-align:center">Keine Anpassungen</td></tr>';
-}
-function anpDel(key,idx){var ma=P.mitarbeiter[SEL];ma[key].splice(idx,1);anpSave(ma);}
-function anpSave(ma){
-    dbMaSpeichern(PID,ma).then(function(){
-        ma._berechnung=berechne(ma,P);ma._jahresgesamt=ma._berechnung.reduce(function(s,r){return s+r.g;},0);
-        P._gesamtkosten=P.mitarbeiter.reduce(function(s,m){return s+(m._jahresgesamt||0);},0);
-        document.getElementById('gesamtkosten').textContent='Gesamtkosten: '+fmtEur(P._gesamtkosten);
-        fillPlanung(ma);fillHochrechnung(ma);buildMaListe();showToast('Gespeichert');
-    });
-}
-function fillMonatSel(id){document.getElementById(id).innerHTML=MONATE.map(function(m,i){return '<option value="'+(i+1)+'">'+m+'</option>';}).join('');}
+/* Stufenaufstieg */
+function dlgStufe(ed){if(SEL===null)return;var ma=P.mitarbeiter[SEL];var h='<div class="fg"><label>Tarif:</label><select id="dd-t" class="inp" onchange="ddTC()"><option value="">\u2013</option>'+Object.keys(P.tarife||{}).map(function(t){return'<option value="'+t+'"'+(t===ma.tarif?" selected":"")+">"+t+"</option>"}).join("")+"</select></div>";h+='<div class="fg"><label>Entgeltgruppe:</label><select id="dd-eg" class="inp" onchange="ddEC()"></select></div>';h+='<div class="fg"><label>Neue Stufe:</label><select id="dd-st" class="inp" onchange="ddSC()"></select></div>';h+='<div class="fg"><label>Neues Monatsbrutto (\u20ac):</label><input type="text" id="dd-b" class="inp" value="'+(ed?ed.brutto:"")+'"></div>';h+='<div class="fg"><label>Ab Monat:</label><select id="dd-m" class="inp">'+moO(ed?ed.ab:1)+"</select></div>";h+='<div class="fg"><label>Bemerkung:</label><input type="text" id="dd-bem" class="inp" value="'+(ed?ed.bem||"":"")+'"></div>';h+='<div class="da"><button class="be ba" onclick="stufeOk('+(ed?"1":"0")+')">Uebernehmen</button></div>';DO("Stufenaufstieg",h);ddTC(ed?ed.eg||ma.eg:ma.eg,ed?ed.stufe:"")}
+function ddTC(se,ss){var t=document.getElementById("dd-t").value;document.getElementById("dd-eg").innerHTML='<option value="">\u2013</option>'+entgeltEgForTarif(P,t).map(function(e){return'<option value="'+e+'"'+(e===se?" selected":"")+">"+e+"</option>"}).join("");ddEC(ss)}
+function ddEC(ss){var t=document.getElementById("dd-t").value,eg=document.getElementById("dd-eg").value;document.getElementById("dd-st").innerHTML='<option value="">\u2013</option>'+entgeltStufenForEg(P,eg,t).map(function(s){return'<option value="'+s+'"'+(s===ss?" selected":"")+">"+s+"</option>"}).join("")}
+function ddSC(){var b=entgelt(P,document.getElementById("dd-eg").value,document.getElementById("dd-st").value,document.getElementById("dd-t").value);if(b!==null)document.getElementById("dd-b").value=b.toFixed(2)}
+function stufeOk(isE){var b=parseNum(document.getElementById("dd-b").value);if(!b){toast("Brutto eingeben","error");return}var ma=P.mitarbeiter[SEL];ma.stufenaufstiege=ma.stufenaufstiege||[];if(!isE)ma.stufenaufstiege.push({eg:document.getElementById("dd-eg").value,stufe:document.getElementById("dd-st").value,brutto:b,ab:parseInt(document.getElementById("dd-m").value),bem:document.getElementById("dd-bem").value});DC();anpSave()}
 
-function dlgStufenaufstieg(){if(SEL===null)return;var ma=P.mitarbeiter[SEL];
-    document.getElementById('d-st-tarif').innerHTML='<option value="">–</option>'+Object.keys(P.tarife||{}).map(function(t){return '<option value="'+t+'"'+(t===ma.tarif?' selected':'')+'>'+t+'</option>';}).join('');
-    fillMonatSel('d-st-monat');document.getElementById('d-st-brutto').value='';document.getElementById('d-st-bem').value='';dlgStufeUpd();document.getElementById('dlg-stufe').showModal();}
-function dlgStufeUpd(){var t=document.getElementById('d-st-tarif').value,eg=document.getElementById('d-st-eg')?document.getElementById('d-st-eg').value:'';
-    document.getElementById('d-st-eg').innerHTML='<option value="">–</option>'+entgeltEgForTarif(P,t).map(function(e){return '<option value="'+e+'"'+(e===eg?' selected':'')+'>'+e+'</option>';}).join('');
-    document.getElementById('d-st-stufe').innerHTML='<option value="">–</option>'+entgeltStufenForEg(P,eg,t).map(function(s){return '<option value="'+s+'">'+s+'</option>';}).join('');}
-function dlgStufeAutoB(){var t=document.getElementById('d-st-tarif').value,eg=document.getElementById('d-st-eg').value,st=document.getElementById('d-st-stufe').value;if(eg&&st){var b=entgelt(P,eg,st,t);if(b!==null)document.getElementById('d-st-brutto').value=b.toFixed(2).replace('.',',');}}
-function stufenaufstiegOk(){if(SEL===null)return;var ma=P.mitarbeiter[SEL];var b=parseNum(document.getElementById('d-st-brutto').value);if(!b){showToast('Brutto eingeben','error');return;}
-    ma.stufenaufstiege=ma.stufenaufstiege||[];ma.stufenaufstiege.push({eg:document.getElementById('d-st-eg').value,stufe:document.getElementById('d-st-stufe').value,brutto:b,ab:parseInt(document.getElementById('d-st-monat').value),bem:document.getElementById('d-st-bem').value});
-    document.getElementById('dlg-stufe').close();anpSave(ma);}
+/* Erhoehung */
+function dlgErh(ed){if(SEL===null)return;var isPz=ed?!!ed.pz:true,val=ed?(ed.pz||ed.bt||""):"";var h='<div><label class="rl"><input type="radio" name="et" value="pz"'+(isPz?" checked":"")+'> Prozent (%)</label><label class="rl"><input type="radio" name="et" value="bt"'+(!isPz?" checked":"")+'> Betrag (\u20ac)</label></div>';h+='<div class="fg"><label>Wert:</label><input type="text" id="de-w" class="inp" value="'+val+'"></div>';h+='<div class="fg"><label>Ab Monat:</label><select id="de-m" class="inp">'+moO(ed?ed.ab:1)+"</select></div>";h+='<div class="fg"><label>Bemerkung:</label><input type="text" id="de-bem" class="inp" value="'+(ed?ed.bem||"":"")+'"></div>';h+='<div class="da"><button class="be ba" onclick="erhOk('+(ed?"1":"0")+')">Uebernehmen</button></div>';DO("Individuelle Erhoehung",h)}
+function erhOk(isE){var w=parseNum(document.getElementById("de-w").value);if(!w){toast("Wert eingeben","error");return}var typ=document.querySelector('input[name="et"]:checked').value,ma=P.mitarbeiter[SEL];if(!isE){ma.ind_erhoehungen=ma.ind_erhoehungen||[];var e={ab:parseInt(document.getElementById("de-m").value),bem:document.getElementById("de-bem").value};if(typ==="pz"){e.pz=w;e.bt=null}else{e.bt=w;e.pz=null}ma.ind_erhoehungen.push(e)}DC();anpSave()}
 
-function dlgErhoehung(){if(SEL===null)return;fillMonatSel('d-erh-monat');document.getElementById('d-erh-wert').value='';document.getElementById('d-erh-bem').value='';document.getElementById('dlg-erh').showModal();}
-function erhoehungOk(){if(SEL===null)return;var ma=P.mitarbeiter[SEL];var typ=document.querySelector('input[name="erh-typ"]:checked').value,w=parseNum(document.getElementById('d-erh-wert').value);if(!w){showToast('Wert eingeben','error');return;}
-    ma.ind_erhoehungen=ma.ind_erhoehungen||[];var e={ab:parseInt(document.getElementById('d-erh-monat').value),bem:document.getElementById('d-erh-bem').value};if(typ==='pz')e.pz=w;else e.bt=w;ma.ind_erhoehungen.push(e);document.getElementById('dlg-erh').close();anpSave(ma);}
+/* Stundenanpassung */
+function dlgStd(ed){if(SEL===null)return;var ma=P.mitarbeiter[SEL],ts=tarifStunden(P,ma.tarif)||38.5;var h='<div class="il">Tarifstunden: '+ts.toFixed(1)+'h</div>';h+='<div class="fg"><label>Neue Vollkraft (VK):</label><input type="text" id="ds-vk" class="inp" value="'+(ed?ed.vk:ma.vk||1)+'"></div>';h+='<div class="fg"><label>Wochenstunden:</label><input type="text" id="ds-std" class="inp" value="'+(ed?(ts*ed.vk).toFixed(1):(ts*(ma.vk||1)).toFixed(1))+'" readonly></div>';h+='<div class="fg"><label>Ab Monat:</label><select id="ds-m" class="inp">'+moO(ed?ed.ab:1)+"</select></div>";h+='<div class="fg"><label>Bemerkung:</label><input type="text" id="ds-bem" class="inp" value="'+(ed?ed.bem||"":"")+'"></div>';h+='<div class="da"><button class="be ba" onclick="stdOk()">Uebernehmen</button></div>';DO("Stundenanpassung",h)}
+function stdOk(){var vk=parseNum(document.getElementById("ds-vk").value),ma=P.mitarbeiter[SEL];ma.std_anpassungen=ma.std_anpassungen||[];ma.std_anpassungen.push({vk:vk,ab:parseInt(document.getElementById("ds-m").value),bem:document.getElementById("ds-bem").value});DC();anpSave()}
 
-function dlgStundenanpassung(){if(SEL===null)return;document.getElementById('d-std-vk').value='';fillMonatSel('d-std-monat');document.getElementById('d-std-bem').value='';document.getElementById('dlg-std').showModal();}
-function stundenanpassungOk(){if(SEL===null)return;var ma=P.mitarbeiter[SEL];var vk=parseNum(document.getElementById('d-std-vk').value);
-    ma.std_anpassungen=ma.std_anpassungen||[];ma.std_anpassungen.push({vk:vk,ab:parseInt(document.getElementById('d-std-monat').value),bem:document.getElementById('d-std-bem').value});document.getElementById('dlg-std').close();anpSave(ma);}
+/* Abwesenheit */
+function dlgAbw(ed){if(SEL===null)return;var gruende=["Elternzeit","Sonderurlaub","Krankheit ohne Lohnfortzahlung","Unbezahlter Urlaub","Sonstiges"];var h='<div class="fg"><label>Grund:</label><select id="da-g" class="inp">'+gruende.map(function(g){return"<option"+(ed&&ed.grund===g?" selected":"")+">"+g+"</option>"}).join("")+"</select></div>";h+='<div class="fg"><label>Von (TT.MM.JJJJ):</label><input type="text" id="da-v" class="inp" value="'+(ed?datumAnzeige(ed.von):"")+'"></div>';h+='<div class="fg"><label>Bis (TT.MM.JJJJ):</label><input type="text" id="da-b" class="inp" value="'+(ed?datumAnzeige(ed.bis):"")+'"></div>';h+='<div class="fg"><label>Bemerkung:</label><input type="text" id="da-bem" class="inp" value="'+(ed?ed.bem||"":"")+'"></div>';h+='<div class="da"><button class="be ba" onclick="abwOk()">Uebernehmen</button></div>';DO("Abwesenheit",h)}
+function abwOk(){var v=document.getElementById("da-v").value,b=document.getElementById("da-b").value;if(!v||!b){toast("Von/Bis eingeben","error");return}var ma=P.mitarbeiter[SEL];ma.abwesenheiten=ma.abwesenheiten||[];ma.abwesenheiten.push({grund:document.getElementById("da-g").value,von:datumIso(v)||v,bis:datumIso(b)||b,bem:document.getElementById("da-bem").value});DC();anpSave()}
 
-function dlgAbwesenheit(){if(SEL===null)return;document.getElementById('d-abw-von').value='';document.getElementById('d-abw-bis').value='';document.getElementById('d-abw-bem').value='';document.getElementById('dlg-abw').showModal();}
-function abwesenheitOk(){if(SEL===null)return;var ma=P.mitarbeiter[SEL];var von=document.getElementById('d-abw-von').value,bis=document.getElementById('d-abw-bis').value;if(!von||!bis){showToast('Von/Bis eingeben','error');return;}
-    ma.abwesenheiten=ma.abwesenheiten||[];ma.abwesenheiten.push({grund:document.getElementById('d-abw-grund').value,von:von,bis:bis,bem:document.getElementById('d-abw-bem').value});document.getElementById('dlg-abw').close();anpSave(ma);}
+/* SZ Person */
+function dlgSzP(){if(SEL===null)return;var ma=P.mitarbeiter[SEL],szo=ma.sz_override||{},typ=szo.deaktiviert?"deak":szo.manuell?"man":"std";var h='<label class="rl"><input type="radio" name="szt" value="std"'+(typ==="std"?" checked":"")+'> Standard (aus Einstellungen)</label>';h+='<label class="rl"><input type="radio" name="szt" value="deak"'+(typ==="deak"?" checked":"")+'> Deaktiviert</label>';h+='<label class="rl"><input type="radio" name="szt" value="man"'+(typ==="man"?" checked":"")+'> Manuell</label>';h+='<div class="fr" style="margin:8px 0"><div class="fg"><label>Betrag (\u20ac):</label><input type="text" id="szp-bt" class="inp" style="width:100px" value="'+(szo.betrag||0)+'"></div><div class="fg"><label>Monat:</label><select id="szp-m" class="inp">'+moO(szo.monat||11)+"</select></div></div>";h+='<div class="fg"><label>Bemerkung:</label><input type="text" id="szp-bem" class="inp" value="'+(szo.bem||"")+'"></div>';h+='<div class="da"><button class="be ba" onclick="szpOk()">Uebernehmen</button></div>';DO("Jahressonderzahlung (Person)",h)}
+function szpOk(){var typ=document.querySelector('input[name="szt"]:checked').value,ma=P.mitarbeiter[SEL];if(typ==="std")ma.sz_override=null;else if(typ==="deak")ma.sz_override={deaktiviert:true,bem:document.getElementById("szp-bem").value};else ma.sz_override={manuell:true,betrag:parseNum(document.getElementById("szp-bt").value),monat:parseInt(document.getElementById("szp-m").value),bem:document.getElementById("szp-bem").value};DC();anpSave()}
 
-// ─── Hochrechnung ──────────────────────────────────────────────────
-function fillHochrechnung(ma) {
-    var e=ma._berechnung;if(!e)return;var tbody=document.querySelector('#tbl-hochrechnung tbody');var sB=0,sSZ=0,sAG=0,sG=0;
-    tbody.innerHTML=e.map(function(r){sB+=r.b;sSZ+=r.sz;sAG+=r.ag;sG+=r.g;
-        return '<tr'+(r.ist?' class="ist-row"':'')+'><td>'+r.mn+(r.ist?' (IST)':'')+'</td><td>'+(r.vk||0).toFixed(2)+'</td><td>'+(r.a*100).toFixed(0)+'%</td><td>'+fmtEur(r.b)+'</td><td>'+fmtEur(r.sz)+'</td><td>'+fmtEur(r.ag)+'</td><td>'+fmtEur(r.g)+'</td></tr>';}).join('');
-    document.getElementById('hr-sum-b').textContent=fmtEur(sB);document.getElementById('hr-sum-sz').textContent=fmtEur(sSZ);
-    document.getElementById('hr-sum-ag').textContent=fmtEur(sAG);document.getElementById('hr-sum-g').textContent=fmtEur(sG);
-}
+/* Einstellungen Dialoge */
+function dlgProjSet(){DO("Projekteinstellungen",'<div class="fg"><label>Projektname:</label><input type="text" id="dp-n" class="inp" value="'+P.name+'"></div><div class="fg"><label>Jahr:</label><input type="number" id="dp-j" class="inp" style="width:100px" value="'+P.jahr+'"></div><div class="da"><button class="be ba" onclick="dpOk()">Uebernehmen</button></div>')}
+function dpOk(){P.name=document.getElementById("dp-n").value;P.jahr=parseInt(document.getElementById("dp-j").value)||P.jahr;dbProjektSpeichern(P).then(function(){document.getElementById("nav-title").textContent="PKR v4.0 \u2013 "+P.name+" ("+P.jahr+")";DC();toast("Gespeichert")})}
+function dlgSV(){var h="";Object.entries(P.sv||{}).forEach(function(e){h+='<div class="fr"><label style="width:200px">'+e[0]+' (%):</label><input type="text" class="inp" style="width:80px" data-sv="'+e[0]+'" value="'+e[1]+'" oninput="svU()"></div>'});h+='<div id="sv-g" style="font-weight:bold;margin:8px 0"></div><div class="da"><button class="be ba" onclick="svOk()">Uebernehmen</button></div>';DO("Sozialversicherungsbeitraege (AG)",h);svU()}
+function svU(){var t=0;document.querySelectorAll("[data-sv]").forEach(function(e){t+=parseFloat(e.value)||0});var el=document.getElementById("sv-g");if(el)el.textContent="AG-Gesamtsatz: "+t.toFixed(2)+" %"}
+function svOk(){document.querySelectorAll("[data-sv]").forEach(function(e){P.sv[e.dataset.sv]=parseFloat(e.value)||0});dbProjektSpeichern(P).then(function(){DC();ladeProjekt();toast("SV gespeichert")})}
+function dlgTarife(){var h='<table class="tt" style="margin-bottom:8px"><thead><tr><th>Tarif</th><th>Wochenstunden</th><th></th></tr></thead><tbody id="dt-tb"></tbody></table><div class="fr"><input type="text" id="dt-n" class="inp" style="width:120px" placeholder="Name"><input type="number" id="dt-s" class="inp" style="width:80px" value="39"><button class="be" onclick="dtA()">+</button></div><div class="da"><button class="be ba" onclick="DC()">Schliessen</button></div>';DO("Tarife",h);dtR()}
+function dtR(){document.getElementById("dt-tb").innerHTML=Object.entries(P.tarife||{}).map(function(e){return"<tr><td>"+e[0]+"</td><td>"+(e[1].stunden||0)+'</td><td><button class="be" style="padding:1px 6px" onclick="dtD(\''+e[0]+'\')">x</button></td></tr>'}).join("")}
+function dtA(){var n=document.getElementById("dt-n").value.trim(),s=parseFloat(document.getElementById("dt-s").value)||39;if(!n)return;P.tarife=P.tarife||{};P.tarife[n]={stunden:s};dbProjektSpeichern(P).then(function(){dtR();document.getElementById("dt-n").value=""})}
+function dtD(k){delete P.tarife[k];dbProjektSpeichern(P).then(dtR)}
+function dlgDA(){var h='<table class="tt" style="margin-bottom:8px"><thead><tr><th>Code</th><th>Bezeichnung</th><th></th></tr></thead><tbody id="dda-tb"></tbody></table><div class="fr"><input type="text" id="dda-c" class="inp" style="width:80px" placeholder="Code"><input type="text" id="dda-b" class="inp" placeholder="Bezeichnung"><button class="be" onclick="ddaA()">+</button></div><div class="da"><button class="be ba" onclick="DC()">Schliessen</button></div>';DO("Dienstarten verwalten",h);ddaR()}
+function ddaR(){document.getElementById("dda-tb").innerHTML=Object.entries(P.dienstarten||{}).sort(function(a,b){return a[0].localeCompare(b[0])}).map(function(e){return"<tr><td>"+e[0]+"</td><td>"+(e[1].bezeichnung||"")+'</td><td><button class="be" style="padding:1px 6px" onclick="ddaD(\''+e[0]+'\')">x</button></td></tr>'}).join("")}
+function ddaA(){var c=document.getElementById("dda-c").value.trim(),b=document.getElementById("dda-b").value.trim();if(!c)return;P.dienstarten=P.dienstarten||{};P.dienstarten[c]={bezeichnung:b};dbProjektSpeichern(P).then(function(){ddaR();document.getElementById("dda-c").value="";document.getElementById("dda-b").value=""})}
+function ddaD(c){delete P.dienstarten[c];dbProjektSpeichern(P).then(ddaR)}
+function dlgKST(){var h='<table class="tt" style="margin-bottom:8px"><thead><tr><th>Code</th><th>Bezeichnung</th><th></th></tr></thead><tbody id="dks-tb"></tbody></table><div class="fr"><input type="text" id="dks-c" class="inp" style="width:80px" placeholder="Code"><input type="text" id="dks-b" class="inp" placeholder="Bezeichnung"><button class="be" onclick="dksA()">+</button></div><div class="da"><button class="be ba" onclick="DC()">Schliessen</button></div>';DO("Kostenstellen verwalten",h);dksR()}
+function dksR(){document.getElementById("dks-tb").innerHTML=Object.entries(P.kostenstellen||{}).sort(function(a,b){return a[0].localeCompare(b[0])}).map(function(e){return"<tr><td>"+e[0]+"</td><td>"+(e[1].bezeichnung||"")+'</td><td><button class="be" style="padding:1px 6px" onclick="dksD(\''+e[0]+'\')">x</button></td></tr>'}).join("")}
+function dksA(){var c=document.getElementById("dks-c").value.trim(),b=document.getElementById("dks-b").value.trim();if(!c)return;P.kostenstellen=P.kostenstellen||{};P.kostenstellen[c]={bezeichnung:b};dbProjektSpeichern(P).then(function(){dksR();document.getElementById("dks-c").value="";document.getElementById("dks-b").value=""})}
+function dksD(c){delete P.kostenstellen[c];dbProjektSpeichern(P).then(dksR)}
+function dlgET(){var h='<div style="max-height:300px;overflow:auto"><table class="tt"><thead><tr><th>Tarif</th><th>EG</th><th>Stufe</th><th>Brutto</th><th></th></tr></thead><tbody id="det-tb"></tbody></table></div><div class="fr" style="margin-top:8px"><select id="det-t" class="inp" style="width:90px"><option value="">\u2013</option>'+Object.keys(P.tarife||{}).map(function(t){return"<option>"+t+"</option>"}).join("")+'</select><input type="text" id="det-eg" class="inp" style="width:60px" placeholder="EG"><input type="text" id="det-st" class="inp" style="width:50px" placeholder="Stufe"><input type="text" id="det-b" class="inp" style="width:80px" placeholder="Brutto"><button class="be" onclick="detA()">+</button></div><div class="da"><button class="be ba" onclick="DC()">Schliessen</button></div>';DO("Entgelttabelle",h);detR()}
+function detR(){var et=P.entgelttabelle||{},rows=[];Object.keys(et).forEach(function(k1){var v1=et[k1];if(typeof v1!=="object"||v1===null)return;var fv=null;for(var fk in v1){fv=v1[fk];break}if(fv&&typeof fv==="object"&&!Array.isArray(fv)){Object.keys(v1).forEach(function(eg){var sts=v1[eg];if(typeof sts!=="object")return;Object.keys(sts).forEach(function(st){rows.push([k1,eg,st,sts[st]])})})}else{Object.keys(v1).forEach(function(st){rows.push(["",k1,st,v1[st]])})}});rows.sort(function(a,b){return(a[0]+a[1]+a[2]).localeCompare(b[0]+b[1]+b[2])});document.getElementById("det-tb").innerHTML=rows.map(function(r){return"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td><td>"+r[2]+"</td><td>"+fmtEur(r[3])+'</td><td><button class="be" style="padding:1px 6px" onclick="detD(\''+r[0]+"','"+r[1]+"','"+r[2]+'\')">x</button></td></tr>'}).join("")}
+function detA(){var t=document.getElementById("det-t").value,eg=document.getElementById("det-eg").value.trim(),st=document.getElementById("det-st").value.trim(),b=parseNum(document.getElementById("det-b").value);if(!eg||!st||!b)return;P.entgelttabelle=P.entgelttabelle||{};if(t){P.entgelttabelle[t]=P.entgelttabelle[t]||{};P.entgelttabelle[t][eg]=P.entgelttabelle[t][eg]||{};P.entgelttabelle[t][eg][st]=b}else{P.entgelttabelle[eg]=P.entgelttabelle[eg]||{};P.entgelttabelle[eg][st]=b}dbProjektSpeichern(P).then(detR)}
+function detD(t,eg,st){if(t&&P.entgelttabelle[t]&&P.entgelttabelle[t][eg])delete P.entgelttabelle[t][eg][st];else if(P.entgelttabelle[eg])delete P.entgelttabelle[eg][st];dbProjektSpeichern(P).then(detR)}
+function dlgSZG(){var h='<table class="tt" style="margin-bottom:8px"><thead><tr><th>Tarif</th><th>EG</th><th>%</th><th></th></tr></thead><tbody id="dsz-tb"></tbody></table><div class="fr"><input type="text" id="dsz-t" class="inp" style="width:80px" placeholder="Tarif"><input type="text" id="dsz-eg" class="inp" style="width:60px" placeholder="EG"><input type="text" id="dsz-pz" class="inp" style="width:60px" placeholder="%"><button class="be" onclick="dszA()">+</button></div><div style="margin:8px 0"><label>Standard Monat:</label><select id="dsz-m" class="inp">'+moO(P.sz_monat||11)+'</select> <label>Prozent:</label><input type="text" id="dsz-dp" class="inp" style="width:60px" value="'+(P.sz_prozent||90)+'"></div><div class="da"><button class="be ba" onclick="dszOk()">Uebernehmen</button></div>';DO("Jahressonderzahlung",h);dszR()}
+function dszR(){var sz=P.sonderzahlung||{},rows=[];Object.entries(sz).forEach(function(e){if(typeof e[1]==="object")Object.entries(e[1]).forEach(function(e2){rows.push([e[0],e2[0],e2[1]])})});document.getElementById("dsz-tb").innerHTML=rows.map(function(r){return"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td><td>"+r[2]+'%</td><td><button class="be" style="padding:1px 6px" onclick="dszD(\''+r[0]+"','"+r[1]+'\')">x</button></td></tr>'}).join("")}
+function dszA(){var t=document.getElementById("dsz-t").value.trim(),eg=document.getElementById("dsz-eg").value.trim(),pz=parseNum(document.getElementById("dsz-pz").value);if(!t||!eg||!pz)return;P.sonderzahlung=P.sonderzahlung||{};P.sonderzahlung[t]=P.sonderzahlung[t]||{};P.sonderzahlung[t][eg]=pz;dbProjektSpeichern(P).then(dszR)}
+function dszD(t,eg){if(P.sonderzahlung&&P.sonderzahlung[t])delete P.sonderzahlung[t][eg];dbProjektSpeichern(P).then(dszR)}
+function dszOk(){P.sz_monat=parseInt(document.getElementById("dsz-m").value);P.sz_prozent=parseNum(document.getElementById("dsz-dp").value);dbProjektSpeichern(P).then(function(){DC();toast("Gespeichert")})}
+function dlgTE(){var h='<table class="tt" style="margin-bottom:8px"><thead><tr><th>Ab</th><th>%</th><th>\u20ac</th><th></th></tr></thead><tbody id="dte-tb"></tbody></table><div class="fr"><select id="dte-m" class="inp" style="width:100px">'+moO(1)+'</select><input type="text" id="dte-pz" class="inp" style="width:60px" placeholder="%"><input type="text" id="dte-bt" class="inp" style="width:70px" placeholder="\u20ac"><button class="be" onclick="dteA()">+</button></div><div class="da"><button class="be ba" onclick="DC()">Schliessen</button></div>';DO("Tariferhoehungen",h);dteR()}
+function dteR(){document.getElementById("dte-tb").innerHTML=(P.tariferhoehungen||[]).map(function(t,i){return"<tr><td>"+MONATE[(t.ab||1)-1]+"</td><td>"+(t.pz?t.pz+"%":"\u2013")+"</td><td>"+(t.bt?fmtEur(t.bt):"\u2013")+'</td><td><button class="be" style="padding:1px 6px" onclick="dteD('+i+')">x</button></td></tr>'}).join("")}
+function dteA(){var ab=parseInt(document.getElementById("dte-m").value),pz=parseNum(document.getElementById("dte-pz").value),bt=parseNum(document.getElementById("dte-bt").value);if(!pz&&!bt)return;P.tariferhoehungen=P.tariferhoehungen||[];var e={ab:ab};if(pz)e.pz=pz;else e.bt=bt;P.tariferhoehungen.push(e);dbProjektSpeichern(P).then(dteR)}
+function dteD(i){P.tariferhoehungen.splice(i,1);dbProjektSpeichern(P).then(dteR)}
+function dlgSpalten(){var h='<p style="margin-bottom:8px">Sichtbare Spalten:</p>';MC.forEach(function(c){h+='<label class="cl" style="display:block;padding:2px 0"><input type="checkbox" data-col="'+c.i+'"'+(MV[c.i]?" checked":"")+"> "+c.l+"</label>"});h+='<div class="da"><button class="be ba" onclick="spOk()">Uebernehmen</button></div>';DO("Spalten",h)}
+function spOk(){document.querySelectorAll("[data-col]").forEach(function(e){MV[e.dataset.col]=e.checked?1:0});DC();buildML()}
 
-// ─── Analyse ───────────────────────────────────────────────────────
-function ladeAnalyse() {
-    if(!P)return;var ms=berechneMonatssummen(P);
-    document.getElementById('analyse-gesamt').innerHTML='<div style="font-size:24px;font-weight:700;color:var(--accent)">'+fmtEur(P._gesamtkosten)+'</div><div class="text-muted">Jahresgesamtkosten '+P.jahr+'</div><div style="margin-top:8px">'+P.mitarbeiter.length+' Mitarbeiter</div>';
-    var ctx=document.getElementById('chart-verlauf');
-    if(chartVerlauf)chartVerlauf.destroy();
-    chartVerlauf=new Chart(ctx,{type:'bar',data:{labels:MK,datasets:[{label:'Monatskosten',data:ms,backgroundColor:'rgba(59,89,152,0.7)',borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{callback:function(v){return fmtEur(v);}}}}}});
-    var daG=berechneNachGruppe(P,'da'),kstG=berechneNachGruppe(P,'kst');
-    document.querySelector('#tbl-analyse-da tbody').innerHTML=Object.values(daG).sort(function(a,b){return b.total-a.total;}).map(function(r){return '<tr><td>'+r.code+'</td><td>'+r.bezeichnung+'</td><td>'+r.count+'</td><td>'+fmtEur(r.total)+'</td></tr>';}).join('')||'<tr><td colspan="4" class="text-muted">–</td></tr>';
-    document.querySelector('#tbl-analyse-kst tbody').innerHTML=Object.values(kstG).sort(function(a,b){return b.total-a.total;}).map(function(r){return '<tr><td>'+r.code+'</td><td>'+r.bezeichnung+'</td><td>'+r.count+'</td><td>'+fmtEur(r.total)+'</td></tr>';}).join('')||'<tr><td colspan="4" class="text-muted">–</td></tr>';
-}
+/* CSV Import */
+function csvDlg(typ){DO("CSV Import",'<p>CSV-Datei ('+(typ==="ist"?"IST-Daten":"Mitarbeiter")+'):</p><input type="file" id="csv-f" accept=".csv" class="inp" style="margin:8px 0"><div class="da"><button class="be ba" onclick="csvRun(\''+typ+"')\">Importieren</button></div>")}
+function csvRun(typ){var inp=document.getElementById("csv-f");if(!inp.files.length){toast("Datei waehlen","error");return}inp.files[0].text().then(function(text){var dl=text.indexOf(";")>=0?";":","||",";var lines=text.split("\n").map(function(l){return l.trim()}).filter(Boolean);if(lines.length<2){toast("Leer","error");return}var hd=lines[0].split(dl).map(function(h){return h.trim().toLowerCase().replace(/"/g,"")});var pr=[],cnt=0;for(var i=1;i<lines.length;i++){var vs=lines[i].split(dl).map(function(v){return v.trim().replace(/"/g,"")});var row={};hd.forEach(function(h,j){row[h]=vs[j]||""});if(typ==="ist"){var pnr=row.pnr||row.personalnummer,mon=parseInt(row.monat||row.mon),br=parseNum(row.brutto||row.monatsbrutto);if(pnr&&mon&&br){var ma=P.mitarbeiter.find(function(m){return String(m.pnr)===String(pnr)});if(ma){ma.ist_daten=ma.ist_daten||{};ma.ist_daten[String(mon)]={brutto:br,ag:parseNum(row.ag),sz:parseNum(row.sz),gesamt:br+parseNum(row.ag)+parseNum(row.sz)};pr.push(dbMaSpeichern(PID,ma));cnt++}}}else{var ma=neuerMa();ma.pnr=row.pnr||row.personalnummer||"";ma.nachname=row.nachname||row.name||"";ma.vorname=row.vorname||"";ma.tarif=row.tarif||"";ma.eg=row.eg||"";ma.stufe=row.stufe||"";ma.da=row.da||"";ma.kst=row.kst||"";ma.brutto=parseNum(row.brutto||"0");ma.vk=parseNum(row.vk||"1");if(row.eintritt)ma.eintritt=datumIso(row.eintritt);if(ma.nachname||ma.pnr){pr.push(dbMaSpeichern(PID,ma));cnt++}}}Promise.all(pr).then(function(){toast(cnt+" importiert");DC();ladeProjekt()})})}
 
-// ─── Einstellungen ─────────────────────────────────────────────────
-function fillEinstellungen() {
-    if(!P)return;
-    document.getElementById('set-name').value=P.name||'';document.getElementById('set-jahr').value=P.jahr||2026;
-    var svEl=document.getElementById('set-sv');
-    svEl.innerHTML=Object.entries(P.sv||{}).map(function(e){return '<div class="sv-row"><label>'+e[0]+'</label><input type="text" class="input input-sm" data-sv="'+e[0]+'" value="'+e[1]+'" style="width:80px" oninput="svUpdate()"> %</div>';}).join('');
-    svUpdate();
-    document.getElementById('set-sz-monat').innerHTML=MONATE.map(function(m,i){return '<option value="'+(i+1)+'"'+((i+1)===(P.sz_monat||11)?' selected':'')+'>'+m+'</option>';}).join('');
-    document.getElementById('set-sz-proz').value=P.sz_prozent||90;
-    fillTarifeTable();fillDATable();fillKSTTable();fillETTable();fillTETable();
-    document.getElementById('add-te-monat').innerHTML=MONATE.map(function(m,i){return '<option value="'+(i+1)+'">'+m+'</option>';}).join('');
-    fillETTarifSel();
-}
-function svUpdate(){var t=0;document.querySelectorAll('[data-sv]').forEach(function(e){t+=parseFloat(e.value)||0;});document.getElementById('sv-gesamt').textContent='AG-Gesamtsatz: '+t.toFixed(2)+' %';}
-function fillTarifeTable(){document.querySelector('#tbl-tarife tbody').innerHTML=Object.entries(P.tarife||{}).map(function(e){return '<tr><td>'+e[0]+'</td><td>'+(e[1].stunden||0)+'</td><td><button class="btn-del-row" onclick="tarifDel(\''+e[0]+'\')">×</button></td></tr>';}).join('')||'<tr><td colspan="3" class="text-muted">–</td></tr>';}
-function tarifAdd(){var n=document.getElementById('add-tarif-name').value.trim(),s=parseFloat(document.getElementById('add-tarif-std').value)||39;if(!n)return;P.tarife=P.tarife||{};P.tarife[n]={stunden:s};einstellungenSpeichern().then(function(){fillTarifeTable();fillETTarifSel();});document.getElementById('add-tarif-name').value='';}
-function tarifDel(k){delete P.tarife[k];einstellungenSpeichern().then(function(){fillTarifeTable();fillETTarifSel();});}
-function fillDATable(){document.querySelector('#tbl-da tbody').innerHTML=Object.entries(P.dienstarten||{}).sort(function(a,b){return a[0].localeCompare(b[0]);}).map(function(e){return '<tr><td>'+e[0]+'</td><td>'+(e[1].bezeichnung||'')+'</td><td><button class="btn-del-row" onclick="daDel(\''+e[0]+'\')">×</button></td></tr>';}).join('')||'<tr><td colspan="3" class="text-muted">–</td></tr>';}
-function daAdd(){var c=document.getElementById('add-da-code').value.trim(),b=document.getElementById('add-da-bez').value.trim();if(!c)return;P.dienstarten=P.dienstarten||{};P.dienstarten[c]={bezeichnung:b};einstellungenSpeichern().then(function(){fillDATable();});document.getElementById('add-da-code').value='';document.getElementById('add-da-bez').value='';}
-function daDel(c){delete P.dienstarten[c];einstellungenSpeichern().then(function(){fillDATable();});}
-function fillKSTTable(){document.querySelector('#tbl-kst tbody').innerHTML=Object.entries(P.kostenstellen||{}).sort(function(a,b){return a[0].localeCompare(b[0]);}).map(function(e){return '<tr><td>'+e[0]+'</td><td>'+(e[1].bezeichnung||'')+'</td><td><button class="btn-del-row" onclick="kstDel(\''+e[0]+'\')">×</button></td></tr>';}).join('')||'<tr><td colspan="3" class="text-muted">–</td></tr>';}
-function kstAdd(){var c=document.getElementById('add-kst-code').value.trim(),b=document.getElementById('add-kst-bez').value.trim();if(!c)return;P.kostenstellen=P.kostenstellen||{};P.kostenstellen[c]={bezeichnung:b};einstellungenSpeichern().then(function(){fillKSTTable();});document.getElementById('add-kst-code').value='';document.getElementById('add-kst-bez').value='';}
-function kstDel(c){delete P.kostenstellen[c];einstellungenSpeichern().then(function(){fillKSTTable();});}
-function fillETTable(){
-    var et=P.entgelttabelle||{},rows=[];
-    Object.keys(et).forEach(function(k1){var v1=et[k1];if(typeof v1!=='object'||v1===null)return;var fv=null;for(var fk in v1){fv=v1[fk];break;}
-        if(fv&&typeof fv==='object'&&!Array.isArray(fv)){Object.keys(v1).forEach(function(eg){var sts=v1[eg];if(typeof sts!=='object')return;Object.keys(sts).forEach(function(st){rows.push([k1,eg,st,sts[st]]);});});}
-        else{Object.keys(v1).forEach(function(st){rows.push(['',k1,st,v1[st]]);});}});
-    rows.sort(function(a,b){return (a[0]+a[1]+a[2]).localeCompare(b[0]+b[1]+b[2]);});
-    document.querySelector('#tbl-et tbody').innerHTML=rows.map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td><td>'+fmtEur(r[3])+'</td><td><button class="btn-del-row" onclick="etDel(\''+r[0]+'\',\''+r[1]+'\',\''+r[2]+'\')">×</button></td></tr>';}).join('')||'<tr><td colspan="5" class="text-muted">–</td></tr>';}
-function fillETTarifSel(){document.getElementById('add-et-tarif').innerHTML='<option value="">–</option>'+Object.keys(P.tarife||{}).map(function(t){return '<option value="'+t+'">'+t+'</option>';}).join('');}
-function etAdd(){var t=document.getElementById('add-et-tarif').value,eg=document.getElementById('add-et-eg').value.trim(),st=document.getElementById('add-et-stufe').value.trim(),b=parseNum(document.getElementById('add-et-brutto').value);if(!eg||!st||!b)return;P.entgelttabelle=P.entgelttabelle||{};if(t){P.entgelttabelle[t]=P.entgelttabelle[t]||{};P.entgelttabelle[t][eg]=P.entgelttabelle[t][eg]||{};P.entgelttabelle[t][eg][st]=b;}else{P.entgelttabelle[eg]=P.entgelttabelle[eg]||{};P.entgelttabelle[eg][st]=b;}einstellungenSpeichern().then(function(){fillETTable();});document.getElementById('add-et-eg').value='';document.getElementById('add-et-stufe').value='';document.getElementById('add-et-brutto').value='';}
-function etDel(t,eg,st){if(t&&P.entgelttabelle[t]&&P.entgelttabelle[t][eg])delete P.entgelttabelle[t][eg][st];else if(P.entgelttabelle[eg])delete P.entgelttabelle[eg][st];einstellungenSpeichern().then(function(){fillETTable();});}
-function fillTETable(){var te=P.tariferhoehungen||[];document.querySelector('#tbl-te tbody').innerHTML=te.map(function(t,i){return '<tr><td>'+MONATE[(t.ab||1)-1]+'</td><td>'+(t.pz?t.pz+'%':'–')+'</td><td>'+(t.bt?fmtEur(t.bt):'–')+'</td><td>'+(t.fda||'–')+'</td><td>'+(t.fkst||'–')+'</td><td><button class="btn-del-row" onclick="teDel('+i+')">×</button></td></tr>';}).join('')||'<tr><td colspan="6" class="text-muted">–</td></tr>';}
-function teAdd(){var ab=parseInt(document.getElementById('add-te-monat').value),pz=parseNum(document.getElementById('add-te-pz').value),bt=parseNum(document.getElementById('add-te-bt').value);if(!pz&&!bt)return;P.tariferhoehungen=P.tariferhoehungen||[];var e={ab:ab};if(pz)e.pz=pz;else e.bt=bt;P.tariferhoehungen.push(e);einstellungenSpeichern().then(function(){fillTETable();});document.getElementById('add-te-pz').value='';document.getElementById('add-te-bt').value='';}
-function teDel(i){P.tariferhoehungen.splice(i,1);einstellungenSpeichern().then(function(){fillTETable();});}
+/* Analysecenter */
+function acOpen(){if(!P||!P.mitarbeiter.length){toast("Keine Mitarbeiter","error");return}document.getElementById("aov").style.display="";document.getElementById("abox").style.display="flex";document.getElementById("aml").innerHTML=P.mitarbeiter.map(function(ma,i){return '<label><input type="checkbox" data-ami="'+i+'" checked> '+maName(ma)+" ("+(ma.pnr||"")+") ["+ma.da+"/"+ma.kst+"]</label>"}).join("");var das=Object.keys(P.dienstarten||{}).sort(),ksts=Object.keys(P.kostenstellen||{}).sort();document.getElementById("afda").innerHTML='<option value="">\u2013</option>'+das.map(function(d){return"<option>"+d+"</option>"}).join("");document.getElementById("afkst").innerHTML='<option value="">\u2013</option>'+ksts.map(function(k){return"<option>"+k+"</option>"}).join("")}
+function acClose(){document.getElementById("aov").style.display="none";document.getElementById("abox").style.display="none";if(acChart){acChart.destroy();acChart=null}}
+function acFilt(){var q=document.getElementById("aq").value.toLowerCase();document.querySelectorAll("#aml label").forEach(function(l){l.style.display=(!q||l.textContent.toLowerCase().indexOf(q)>=0)?"":"none"})}
+function acAll(v){document.querySelectorAll("#aml input").forEach(function(c){c.checked=!!v})}
+function acFDA(){var d=document.getElementById("afda").value;document.querySelectorAll("#aml input").forEach(function(c){var i=parseInt(c.dataset.ami);c.checked=!d||P.mitarbeiter[i].da===d})}
+function acFKST(){var k=document.getElementById("afkst").value;document.querySelectorAll("#aml input").forEach(function(c){var i=parseInt(c.dataset.ami);c.checked=!k||P.mitarbeiter[i].kst===k})}
+function acGetMA(){var r=[];document.querySelectorAll("#aml input:checked").forEach(function(c){r.push(P.mitarbeiter[parseInt(c.dataset.ami)])});return r.length?r:P.mitarbeiter}
+function acRun(){var mal=acGetMA(),typ=document.querySelector('input[name="atyp"]:checked').value,pv=document.getElementById("apv");pv.innerHTML="";if(acChart){acChart.destroy();acChart=null}
+if(typ==="uebersicht"){var h='<table class="tt tn"><thead><tr><th>PNR</th><th>Mitarbeiter</th><th>DA</th><th>KSt</th><th>VK</th><th>Jahreskosten</th></tr></thead><tbody>';var tot=0;mal.forEach(function(ma){var g=berechne(ma,P).reduce(function(s,r){return s+r.g},0);tot+=g;h+='<tr><td style="text-align:left">'+(ma.pnr||"")+'</td><td style="text-align:left">'+maName(ma)+"</td><td>"+ma.da+"</td><td>"+ma.kst+"</td><td>"+(ma.vk||1).toFixed(2)+"</td><td>"+fmtEur(g)+"</td></tr>"});h+='<tr style="font-weight:bold"><td></td><td style="text-align:left">SUMME</td><td></td><td></td><td></td><td>'+fmtEur(tot)+"</td></tr></tbody></table>";pv.innerHTML=h}
+else if(typ==="detail"){var h="";mal.forEach(function(ma){var e=berechne(ma,P),sm={b:0,sz:0,ag:0,g:0};h+='<div style="margin-bottom:12px"><div class="st">'+maName(ma)+" | Tarif: "+(ma.tarif||"-")+" | EG: "+(ma.eg||"-")+" | VK: "+(ma.vk||1).toFixed(2)+'</div><table class="tt tn"><thead><tr><th>Monat</th><th>Brutto</th><th>SZ</th><th>AG</th><th>Gesamt</th></tr></thead><tbody>';e.forEach(function(x){sm.b+=x.b;sm.sz+=x.sz;sm.ag+=x.ag;sm.g+=x.g;h+="<tr><td style='text-align:left'>"+x.mn+"</td><td>"+fmtEur(x.b)+"</td><td>"+fmtEur(x.sz)+"</td><td>"+fmtEur(x.ag)+"</td><td>"+fmtEur(x.g)+"</td></tr>"});h+='<tr style="font-weight:bold"><td style="text-align:left">SUMME</td><td>'+fmtEur(sm.b)+"</td><td>"+fmtEur(sm.sz)+"</td><td>"+fmtEur(sm.ag)+"</td><td>"+fmtEur(sm.g)+"</td></tr></tbody></table></div>"});pv.innerHTML=h}
+else{/* Charts */var canvas=document.createElement("canvas");canvas.style.width="100%";canvas.style.height="100%";pv.appendChild(canvas);var ds=[],labels=MONATE.slice();
+if(typ==="verlauf"){var totals=new Array(12).fill(0);mal.forEach(function(ma){berechne(ma,P).forEach(function(x,i){totals[i]+=x.g})});ds.push({label:"Gesamt",data:totals,backgroundColor:"rgba(59,89,152,0.6)",borderColor:"#3b5998",borderWidth:1})}
+else if(typ==="da"){var grp={};mal.forEach(function(ma){var k=ma.da||"(Keine)";if(!grp[k])grp[k]=new Array(12).fill(0);berechne(ma,P).forEach(function(x,i){grp[k][i]+=x.g})});var colors=["#3b5998","#e74c3c","#2ecc71","#f39c12","#9b59b6","#1abc9c","#e67e22"];var ci=0;Object.entries(grp).forEach(function(e){ds.push({label:e[0]+(daBezeichnung(P,e[0])?" "+daBezeichnung(P,e[0]):""),data:e[1],backgroundColor:colors[ci%colors.length]+"99",borderColor:colors[ci%colors.length],borderWidth:1});ci++})}
+else if(typ==="kst"){var grp={};mal.forEach(function(ma){var k=ma.kst||"(Keine)";if(!grp[k])grp[k]=new Array(12).fill(0);berechne(ma,P).forEach(function(x,i){grp[k][i]+=x.g})});var colors=["#3b5998","#e74c3c","#2ecc71","#f39c12","#9b59b6","#1abc9c"];var ci=0;Object.entries(grp).forEach(function(e){ds.push({label:e[0]+(kstBezeichnung(P,e[0])?" "+kstBezeichnung(P,e[0]):""),data:e[1],backgroundColor:colors[ci%colors.length]+"99",borderColor:colors[ci%colors.length],borderWidth:1});ci++})}
+else if(typ==="ma"){labels=mal.map(function(ma){return maName(ma)});var data=mal.map(function(ma){return berechne(ma,P).reduce(function(s,r){return s+r.g},0)});ds.push({label:"Jahreskosten",data:data,backgroundColor:"rgba(59,89,152,0.6)"})}
+acChart=new Chart(canvas,{type:typ==="ma"?"bar":"bar",data:{labels:labels,datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"top"}},scales:{y:{beginAtZero:true,ticks:{callback:function(v){return fmtEur(v)}}}}}})}}
 
-function einstellungenSpeichern(silent) {
-    var sv={};document.querySelectorAll('[data-sv]').forEach(function(e){sv[e.dataset.sv]=parseFloat(e.value)||0;});
-    P.name=document.getElementById('set-name').value;P.jahr=parseInt(document.getElementById('set-jahr').value);P.sv=sv;
-    P.sz_monat=parseInt(document.getElementById('set-sz-monat').value);P.sz_prozent=parseNum(document.getElementById('set-sz-proz').value);
-    document.getElementById('nav-title').textContent=P.name+' ('+P.jahr+')';
-    return dbProjektSpeichern(P).then(function(){if(!silent)showToast('Einstellungen gespeichert');});
-}
-
-// ─── CSV Import ────────────────────────────────────────────────────
-function csvImport(typ) {
-    var inp=document.getElementById(typ==='ist'?'csv-ist':'csv-ma');
-    if(!inp.files.length){showToast('Datei wählen','error');return;}
-    inp.files[0].text().then(function(text){
-        var dl=text.slice(0,4096).indexOf(';')>=0?';':',';
-        var lines=text.split('\n').map(function(l){return l.trim();}).filter(Boolean);
-        if(lines.length<2){showToast('Datei leer','error');return;}
-        var headers=lines[0].split(dl).map(function(h){return h.trim().toLowerCase().replace(/"/g,'');});
-        var promises=[],count=0;
-        for(var i=1;i<lines.length;i++){
-            var vals=lines[i].split(dl).map(function(v){return v.trim().replace(/"/g,'');});
-            var row={};headers.forEach(function(h,j){row[h]=vals[j]||'';});
-            if(typ==='ist'){
-                var pnr=row.pnr||row.personalnummer,monat=parseInt(row.monat||row.mon),brutto=parseNum(row.brutto||row.monatsbrutto);
-                if(pnr&&monat&&brutto){var ma=P.mitarbeiter.find(function(m){return String(m.pnr)===String(pnr);});
-                    if(ma){ma.ist_daten=ma.ist_daten||{};ma.ist_daten[String(monat)]={brutto:brutto,ag:parseNum(row.ag),sz:parseNum(row.sz),gesamt:brutto+parseNum(row.ag)+parseNum(row.sz)};promises.push(dbMaSpeichern(PID,ma));count++;}}
-            } else {
-                var ma=neuerMa();ma.pnr=row.pnr||row.personalnummer||row.nr||'';ma.nachname=row.nachname||row.name||'';ma.vorname=row.vorname||'';
-                ma.tarif=row.tarif||'';ma.eg=row.eg||row.entgeltgruppe||'';ma.stufe=row.stufe||row.st||'';
-                ma.da=row.da||row.dienstart||'';ma.kst=row.kst||row.kostenstelle||'';
-                ma.brutto=parseNum(row.brutto||row.monatsbrutto||row.gehalt||'0');ma.vk=parseNum(row.vk||row.vollkraft||'1');
-                if(row.eintritt)ma.eintritt=datumIso(row.eintritt);if(row.austritt)ma.austritt=datumIso(row.austritt);
-                if(ma.nachname||ma.pnr){promises.push(dbMaSpeichern(PID,ma));count++;}
-            }
-        }
-        Promise.all(promises).then(function(){showToast(count+' importiert');ladeProjekt();});
-    });
-}
-
-// ---- Diagnostics: global error handlers
-window.addEventListener('error', function(e){
-  try {
-    console.error('PKR error:', e.error || e.message);
-    if (typeof showToast === 'function') showToast('JS-Fehler: ' + (e.message || 'unknown'), 'error');
-  } catch(_) {}
-});
-window.addEventListener('unhandledrejection', function(e){
-  try {
-    console.error('PKR promise rejection:', e.reason);
-    if (typeof showToast === 'function') showToast('Promise-Fehler: ' + (e.reason && e.reason.message ? e.reason.message : 'unknown'), 'error');
-  } catch(_) {}
-});
+/* Szenariovergleich */
+var SZN=[];
+function szOpen(){if(!P||!P.mitarbeiter.length){toast("Keine Mitarbeiter","error");return}SZN=P.szenarien&&P.szenarien.length?JSON.parse(JSON.stringify(P.szenarien)):[{name:"Ist-Stand",te:JSON.parse(JSON.stringify(P.tariferhoehungen||[]))}];document.getElementById("sov").style.display="";document.getElementById("sbox").style.display="flex";szRender()}
+function szClose(){document.getElementById("sov").style.display="none";document.getElementById("sbox").style.display="none"}
+function szRender(){var bd=document.getElementById("sbod");var h='<div class="st">Szenarien</div><table class="tt" style="margin-bottom:8px"><thead><tr><th>Name</th><th>Tariferhoehungen</th><th></th></tr></thead><tbody>';SZN.forEach(function(sz,i){var parts=(sz.te||[]).map(function(t){return(t.pz?"+"+t.pz+"%":"+"+fmtEur(t.bt||0))+" ab "+MONATE[(t.ab||1)-1]});h+="<tr><td>"+sz.name+"</td><td>"+(parts.join("; ")||"(Keine)")+'</td><td>'+(i>0?'<button class="be" style="padding:1px 6px" onclick="szDel('+i+')">x</button>':"")+"</td></tr>"});h+="</tbody></table>";
+h+='<fieldset style="border:1px solid #bdc3c7;padding:8px;margin-bottom:8px"><legend style="font-weight:bold;font-size:12px">Neues Szenario</legend>';h+='<div class="fr"><div class="fg"><label>Name:</label><input type="text" id="sz-n" class="inp" value="Szenario '+(SZN.length+1)+'"></div></div>';h+='<div class="fr" style="margin:4px 0"><select id="sz-m" class="inp" style="width:100px">'+moO(1)+'</select><input type="text" id="sz-pz" class="inp" style="width:60px" placeholder="%"><input type="text" id="sz-bt" class="inp" style="width:70px" placeholder="\u20ac"><button class="be" onclick="szTeA()">Erhoehung +</button></div>';h+='<div id="sz-te-list" style="font-size:11px;margin:4px 0"></div>';h+='<button class="be" onclick="szAdd()">Szenario hinzufuegen</button></fieldset>';
+h+='<div class="fr"><button class="be ba" onclick="szVergleich()">Vergleichen</button><button class="be" onclick="szSaveProj()">Im Projekt speichern</button></div>';h+='<div id="sz-result" style="margin-top:12px"></div>';bd.innerHTML=h}
+var szTeTemp=[];
+function szTeA(){var ab=parseInt(document.getElementById("sz-m").value),pz=parseNum(document.getElementById("sz-pz").value),bt=parseNum(document.getElementById("sz-bt").value);if(!pz&&!bt)return;var e={ab:ab};if(pz)e.pz=pz;else e.bt=bt;szTeTemp.push(e);document.getElementById("sz-te-list").textContent=szTeTemp.map(function(t){return(t.pz?"+"+t.pz+"%":"+"+fmtEur(t.bt))+" ab "+MONATE[(t.ab||1)-1]}).join("; ")}
+function szAdd(){SZN.push({name:document.getElementById("sz-n").value||"Szenario",te:JSON.parse(JSON.stringify(szTeTemp))});szTeTemp=[];szRender()}
+function szDel(i){SZN.splice(i,1);szRender()}
+function szSaveProj(){P.szenarien=JSON.parse(JSON.stringify(SZN));dbProjektSpeichern(P).then(function(){toast("Szenarien gespeichert")})}
+function szVergleich(){if(SZN.length<2){toast("Mind. 2 Szenarien","error");return}var res=document.getElementById("sz-result");res.innerHTML="";var canvas=document.createElement("canvas");canvas.style.width="100%";canvas.style.height="300px";res.appendChild(canvas);var colors=["#3b5998","#e74c3c","#2ecc71","#f39c12","#9b59b6"];var ds=[];SZN.forEach(function(sz,si){var totals=new Array(12).fill(0);P.mitarbeiter.forEach(function(ma){berechne(ma,P,sz.te).forEach(function(x,i){totals[i]+=x.g})});ds.push({label:sz.name,data:totals,borderColor:colors[si%colors.length],backgroundColor:colors[si%colors.length]+"33",borderWidth:2,fill:false})});new Chart(canvas,{type:"line",data:{labels:MONATE,datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"top"}},scales:{y:{beginAtZero:true,ticks:{callback:function(v){return fmtEur(v)}}}}}})}

@@ -1,199 +1,58 @@
 <!DOCTYPE html>
 <html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PKR – Projekt</title>
-    <link rel="stylesheet" href="css/style.css">
-</head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PKR</title><link rel="stylesheet" href="css/app.css"></head>
 <body>
-    <nav class="navbar">
-        <div class="nav-brand">
-            <a href="index.html" class="nav-back" title="Zurück"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></a>
-            <span id="nav-title">PKR</span> <span id="build-badge" style="font-size:12px;opacity:.7;margin-left:10px;">2026-02-27_diag1</span>
-        </div>
-        <div class="nav-actions">
-            <span id="save-indicator" class="save-indicator"></span>
-            <button class="btn btn-sm btn-secondary" onclick="projektSpeichern()">💾 Speichern</button>
-        </div>
-    </nav>
-    <div class="app-layout">
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <input type="text" id="ma-suche" class="input input-sm" placeholder="Suchen..." oninput="filterListe()">
-                <button class="btn btn-sm btn-secondary" onclick="maDuplizieren()" title="Duplizieren">⧉</button>
-        <button class="btn btn-sm btn-primary" onclick="maHinzufuegen()" title="Hinzufügen">+</button>
-            </div>
-            <div class="sidebar-filters">
-                <select id="filter-da" class="input input-sm" onchange="filterListe()"><option value="">Alle DA</option></select>
-                <select id="filter-kst" class="input input-sm" onchange="filterListe()"><option value="">Alle KSt</option></select>
-            </div>
-            <div id="ma-liste" class="ma-list"></div>
-            <div class="sidebar-footer"><div id="gesamtkosten" class="gesamtkosten">Gesamtkosten: –</div></div>
-        </aside>
-        <main class="main-content">
-            <div class="tabs">
-                <button class="tab active" data-tab="stammdaten" onclick="switchTab('stammdaten')">Stammdaten</button>
-                <button class="tab" data-tab="planung" onclick="switchTab('planung')">Planung</button>
-                <button class="tab" data-tab="hochrechnung" onclick="switchTab('hochrechnung')">Hochrechnung</button>
-                <button class="tab" data-tab="analyse" onclick="switchTab('analyse')">Analysecenter</button>
-                <button class="tab" data-tab="einstellungen" onclick="switchTab('einstellungen')">Einstellungen</button>
-            </div>
-            <div class="tab-content active" id="tab-stammdaten">
-                <div id="stamm-empty" class="empty-state">Mitarbeiter auswählen oder neu anlegen</div>
-                <div id="stamm-form" class="stamm-form" style="display:none">
-                    <div class="form-grid">
-                        <fieldset><legend>Persönliche Daten</legend><div class="form-row">
-                            <div class="form-group"><label>PNR</label><input type="text" id="s-pnr" class="input"></div>
-                            <div class="form-group"><label>Titel</label><input type="text" id="s-titel" class="input" style="width:80px"></div>
-                            <div class="form-group fg-grow"><label>Nachname</label><input type="text" id="s-nachname" class="input"></div>
-                            <div class="form-group fg-grow"><label>Vorname</label><input type="text" id="s-vorname" class="input"></div>
-                        </div></fieldset>
-                        <fieldset><legend>Vergütung</legend><div class="form-row">
-                            <div class="form-group"><label>Tarif</label><select id="s-tarif" class="input" onchange="onTarifChanged()"></select></div>
-                            <div class="form-group"><label>EG</label><select id="s-eg" class="input" onchange="onEgChanged()"></select></div>
-                            <div class="form-group"><label>Stufe</label><select id="s-stufe" class="input" onchange="onStufeChanged()"></select></div>
-                            <div class="form-group"><label>Monatsbrutto (€)</label><input type="text" id="s-brutto" class="input" style="width:120px"></div>
-                        </div></fieldset>
-                        <fieldset><legend>Organisation</legend><div class="form-row">
-                            <div class="form-group"><label>Dienstart</label><select id="s-da" class="input"></select></div>
-                            <div class="form-group"><label>Kostenstelle</label><select id="s-kst" class="input"></select></div>
-                            <div class="form-group"><label>VK</label><input type="text" id="s-vk" class="input" style="width:80px" value="1,0" oninput="updateWstd()"></div>
-                            <div class="form-group"><label>Wochenstd.</label><span id="s-wstd" class="input-display">–</span></div>
-                        </div></fieldset>
-                        <fieldset><legend>Ein-/Austritt</legend><div class="form-row">
-                            <div class="form-group"><label>Eintritt</label><input type="date" id="s-eintritt" class="input"></div>
-                            <div class="form-group"><label>Austritt</label><input type="date" id="s-austritt" class="input"></div>
-                        </div></fieldset>
-                        <fieldset><legend>Bemerkungen</legend><textarea id="s-bemerkung" class="input" rows="3" style="width:100%"></textarea></fieldset>
-                    </div>
-                    <div class="form-actions">
-                        <button class="btn btn-primary" onclick="stammSpeichern()">Stammdaten speichern</button>
-                        <button class="btn btn-danger-ghost" onclick="maLoeschen()">Entfernen</button>
-                    </div>
-                </div>
-            </div>
-            <div class="tab-content" id="tab-planung">
-                <div id="plan-empty" class="empty-state">Mitarbeiter auswählen</div>
-                <div id="plan-content" style="display:none">
-                    <div class="plan-actions">
-                        <button class="btn btn-sm btn-secondary" onclick="dlgStufenaufstieg()">Stufenaufstieg</button>
-                        <button class="btn btn-sm btn-secondary" onclick="dlgErhoehung()">Erhöhung</button>
-                        <button class="btn btn-sm btn-secondary" onclick="dlgStundenanpassung()">Stundenanpassung</button>
-                        <button class="btn btn-sm btn-secondary" onclick="dlgAbwesenheit()">Abwesenheit</button>
-                    </div>
-                    <table class="data-table" id="tbl-anpassungen"><thead><tr><th>Typ</th><th>Details</th><th>Ab Monat</th><th>Bemerkung</th><th></th></tr></thead><tbody></tbody></table>
-                </div>
-            </div>
-            <div class="tab-content" id="tab-hochrechnung">
-                <div id="hr-empty" class="empty-state">Mitarbeiter auswählen</div>
-                <div id="hr-content" style="display:none">
-                    <table class="data-table data-table-numbers" id="tbl-hochrechnung">
-                        <thead><tr><th>Monat</th><th>VK</th><th>Anteil</th><th>Brutto</th><th>SZ</th><th>AG</th><th>Gesamt</th></tr></thead>
-                        <tbody></tbody>
-                        <tfoot><tr><th>Summe</th><td></td><td></td><td id="hr-sum-b"></td><td id="hr-sum-sz"></td><td id="hr-sum-ag"></td><td id="hr-sum-g"></td></tr></tfoot>
-                    </table>
-                </div>
-            </div>
-            <div class="tab-content" id="tab-analyse">
-                <div class="analyse-grid">
-                    <div class="card"><h3>Gesamtübersicht</h3><div id="analyse-gesamt"></div></div>
-                    <div class="card"><h3>Monatsverlauf</h3><canvas id="chart-verlauf" height="250"></canvas></div>
-                    <div class="card"><h3>Export</h3>
-                        <div class="form-row" style="gap:10px;flex-wrap:wrap">
-                            <button class="btn btn-secondary" onclick="exportPdfUebersicht()">PDF (Übersicht)</button>
-                            <button class="btn btn-secondary" onclick="exportXlsxUebersicht()">Excel (XLSX)</button>
-                        </div>
-                        <div class="text-muted" style="margin-top:8px;font-size:12px">Export entspricht der EXE-Übersicht (inkl. Summen und Zusammenfassungen).</div>
-                    </div>
-                    <div class="card card-wide"><h3>Szenariovergleich</h3>
-                        <div class="form-row" style="gap:10px;flex-wrap:wrap">
-                            <button class="btn btn-secondary" onclick="showSzenarioDialog()">Szenarien bearbeiten</button>
-                            <button class="btn btn-primary" onclick="szenarioVergleichen()">Vergleichen</button>
-                            <button class="btn btn-secondary" onclick="exportSzenarioPdf()">PDF Export</button>
-                        </div>
-                        <div style="margin-top:10px"><canvas id="chart-szenario" height="220"></canvas></div>
-                        <table class="data-table data-table-numbers" id="tbl-szenario" style="margin-top:10px">
-                            <thead><tr><th>Szenario</th><th>Jahreskosten</th><th>Differenz</th></tr></thead>
-                            <tbody><tr><td colspan="3" class="text-muted">–</td></tr></tbody>
-                        </table>
-                    </div>
-                    <div class="card"><h3>Nach Dienstart</h3><table class="data-table data-table-numbers" id="tbl-analyse-da"><thead><tr><th>DA</th><th>Bezeichnung</th><th>MA</th><th>Jahreskosten</th></tr></thead><tbody></tbody></table></div>
-                    <div class="card"><h3>Nach Kostenstelle</h3><table class="data-table data-table-numbers" id="tbl-analyse-kst"><thead><tr><th>KSt</th><th>Bezeichnung</th><th>MA</th><th>Jahreskosten</th></tr></thead><tbody></tbody></table></div>
-                </div>
-            </div>
-            <div class="tab-content" id="tab-einstellungen">
-                <div class="settings-grid">
-                    <div class="card"><h3>Projektdaten</h3><div class="form-row"><div class="form-group fg-grow"><label>Name</label><input type="text" id="set-name" class="input"></div><div class="form-group"><label>Jahr</label><input type="number" id="set-jahr" class="input" style="width:100px"></div></div></div>
-                    <div class="card"><h3>Sozialversicherung (AG %)</h3><div id="set-sv"></div><div id="sv-gesamt" class="sv-gesamt"></div></div>
-                    <div class="card"><h3>Jahressonderzahlung</h3><div class="form-row"><div class="form-group"><label>Monat</label><select id="set-sz-monat" class="input"></select></div><div class="form-group"><label>Prozent</label><input type="text" id="set-sz-proz" class="input" style="width:80px"></div></div></div>
-                    <div class="card"><h3>Tarife</h3><table class="data-table" id="tbl-tarife"><thead><tr><th>Tarif</th><th>Wochenstd.</th><th></th></tr></thead><tbody></tbody></table><div class="form-row mt-2"><input type="text" id="add-tarif-name" class="input input-sm" placeholder="Name"><input type="number" id="add-tarif-std" class="input input-sm" placeholder="Std" style="width:80px" value="39"><button class="btn btn-sm btn-primary" onclick="tarifAdd()">+</button></div></div>
-                    <div class="card"><h3>Dienstarten</h3><table class="data-table" id="tbl-da"><thead><tr><th>Code</th><th>Bezeichnung</th><th></th></tr></thead><tbody></tbody></table><div class="form-row mt-2"><input type="text" id="add-da-code" class="input input-sm" placeholder="Code" style="width:80px"><input type="text" id="add-da-bez" class="input input-sm" placeholder="Bezeichnung"><button class="btn btn-sm btn-primary" onclick="daAdd()">+</button></div></div>
-                    <div class="card"><h3>Kostenstellen</h3><table class="data-table" id="tbl-kst"><thead><tr><th>Code</th><th>Bezeichnung</th><th></th></tr></thead><tbody></tbody></table><div class="form-row mt-2"><input type="text" id="add-kst-code" class="input input-sm" placeholder="Code" style="width:80px"><input type="text" id="add-kst-bez" class="input input-sm" placeholder="Bezeichnung"><button class="btn btn-sm btn-primary" onclick="kstAdd()">+</button></div></div>
-                    <div class="card card-wide"><h3>Entgelttabelle</h3><table class="data-table data-table-numbers" id="tbl-et"><thead><tr><th>Tarif</th><th>EG</th><th>Stufe</th><th>Brutto (€)</th><th></th></tr></thead><tbody></tbody></table><div class="form-row mt-2"><select id="add-et-tarif" class="input input-sm"></select><input type="text" id="add-et-eg" class="input input-sm" placeholder="EG" style="width:80px"><input type="text" id="add-et-stufe" class="input input-sm" placeholder="Stufe" style="width:60px"><input type="text" id="add-et-brutto" class="input input-sm" placeholder="Brutto" style="width:100px"><button class="btn btn-sm btn-primary" onclick="etAdd()">+</button></div></div>
-                    <div class="card card-wide"><h3>Tariferhöhungen</h3><table class="data-table" id="tbl-te"><thead><tr><th>Ab Monat</th><th>Prozent</th><th>Betrag</th><th>Filter DA</th><th>Filter KSt</th><th></th></tr></thead><tbody></tbody></table><div class="form-row mt-2"><select id="add-te-monat" class="input input-sm"></select><input type="text" id="add-te-pz" class="input input-sm" placeholder="%" style="width:60px"><input type="text" id="add-te-bt" class="input input-sm" placeholder="€" style="width:80px"><button class="btn btn-sm btn-primary" onclick="teAdd()">+</button></div></div>
-                    <div class="card card-wide"><h3>CSV Import</h3><div class="form-row"><div class="form-group"><label>Mitarbeiter</label><input type="file" id="csv-ma" accept=".csv" class="input"><button class="btn btn-sm btn-secondary mt-1" onclick="csvImport('ma')">Importieren</button></div><div class="form-group"><label>IST-Daten</label><input type="file" id="csv-ist" accept=".csv" class="input"><button class="btn btn-sm btn-secondary mt-1" onclick="csvImport('ist')">Importieren</button></div></div></div>
-                    <div class="form-actions"><button class="btn btn-primary" onclick="einstellungenSpeichern()">Einstellungen speichern</button></div>
-                </div>
-            </div>
-        </main>
-    </div>
-    <dialog id="dlg-stufe"><div class="dialog-content"><h2>Stufenaufstieg</h2>
-        <div class="form-group"><label>Tarif</label><select id="d-st-tarif" class="input" onchange="dlgStufeUpd()"></select></div>
-        <div class="form-group"><label>EG</label><select id="d-st-eg" class="input" onchange="dlgStufeUpd()"></select></div>
-        <div class="form-group"><label>Neue Stufe</label><select id="d-st-stufe" class="input" onchange="dlgStufeAutoB()"></select></div>
-        <div class="form-group"><label>Neues Brutto (€)</label><input type="text" id="d-st-brutto" class="input"></div>
-        <div class="form-group"><label>Ab Monat</label><select id="d-st-monat" class="input"></select></div>
-        <div class="form-group"><label>Bemerkung</label><input type="text" id="d-st-bem" class="input"></div>
-        <div class="dialog-actions"><button class="btn btn-secondary" onclick="this.closest('dialog').close()">Abbrechen</button><button class="btn btn-primary" onclick="stufenaufstiegOk()">Übernehmen</button></div>
-    </div></dialog>
-    <dialog id="dlg-erh"><div class="dialog-content"><h2>Individuelle Erhöhung</h2>
-        <div class="form-row"><label><input type="radio" name="erh-typ" value="pz" checked> Prozent</label><label><input type="radio" name="erh-typ" value="bt"> Betrag</label></div>
-        <div class="form-group"><label>Wert</label><input type="text" id="d-erh-wert" class="input"></div>
-        <div class="form-group"><label>Ab Monat</label><select id="d-erh-monat" class="input"></select></div>
-        <div class="form-group"><label>Bemerkung</label><input type="text" id="d-erh-bem" class="input"></div>
-        <div class="dialog-actions"><button class="btn btn-secondary" onclick="this.closest('dialog').close()">Abbrechen</button><button class="btn btn-primary" onclick="erhoehungOk()">Übernehmen</button></div>
-    </div></dialog>
-    <dialog id="dlg-std"><div class="dialog-content"><h2>Stundenanpassung</h2>
-        <div class="form-group"><label>Neue VK</label><input type="text" id="d-std-vk" class="input"></div>
-        <div class="form-group"><label>Ab Monat</label><select id="d-std-monat" class="input"></select></div>
-        <div class="form-group"><label>Bemerkung</label><input type="text" id="d-std-bem" class="input"></div>
-        <div class="dialog-actions"><button class="btn btn-secondary" onclick="this.closest('dialog').close()">Abbrechen</button><button class="btn btn-primary" onclick="stundenanpassungOk()">Übernehmen</button></div>
-    </div></dialog>
-    <dialog id="dlg-abw"><div class="dialog-content"><h2>Abwesenheit</h2>
-        <div class="form-group"><label>Grund</label><select id="d-abw-grund" class="input"><option>Elternzeit</option><option>Sonderurlaub</option><option>Krankheit ohne Lohnfortzahlung</option><option>Unbezahlter Urlaub</option><option>Sonstiges</option></select></div>
-        <div class="form-group"><label>Von</label><input type="date" id="d-abw-von" class="input"></div>
-        <div class="form-group"><label>Bis</label><input type="date" id="d-abw-bis" class="input"></div>
-        <div class="form-group"><label>Bemerkung</label><input type="text" id="d-abw-bem" class="input"></div>
-        <div class="dialog-actions"><button class="btn btn-secondary" onclick="this.closest('dialog').close()">Abbrechen</button><button class="btn btn-primary" onclick="abwesenheitOk()">Übernehmen</button></div>
-    </div></dialog>
-    <dialog id="dlg-szenario"><div class="dialog-content" style="max-width:720px">
-        <h2>Szenarien</h2>
-        <div class="text-muted" style="margin-bottom:8px">Hinweis: Szenarien 1..n blenden IST-Daten aus (wie in der EXE).</div>
-        <div id="sz-list" class="sz-list"></div>
-        <div class="form-row mt-2" style="gap:10px">
-            <input type="text" id="sz-name" class="input" placeholder="Neues Szenario (Name)">
-            <button class="btn btn-sm btn-primary" onclick="szAdd()">+</button>
-        </div>
-        <div class="dialog-actions" style="justify-content:space-between">
-            <button class="btn btn-secondary" onclick="this.closest('dialog').close()">Schließen</button>
-            <button class="btn btn-primary" onclick="szSaveToProject()">Im Projekt speichern</button>
-        </div>
-    </div></dialog>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/config.js"></script>
-    <script src="js/calc.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/export.js"></script>
-    <script src="js/app.js"></script>
-    <script>
-        var pid = new URLSearchParams(window.location.search).get('id');
-        if (pid) { initDB(SUPABASE_URL, SUPABASE_KEY); initProjekt(pid); }
-        else { window.location.href = 'index.html'; }
-    </script>
-</body>
-</html>
+<nav class="menubar">
+ <div class="mi" tabindex="0"><span>Datei</span><div class="mdd"><a href="index.html">Projektübersicht</a><a onclick="projektSpeichern()">Projekt speichern <kbd>Strg+S</kbd></a><div class="msep"></div><a onclick="csvDlg('ma')">CSV importieren (Mitarbeiter)</a><a onclick="csvDlg('ist')">CSV importieren (IST-Daten)</a></div></div>
+ <div class="mi" tabindex="0"><span>Einstellungen</span><div class="mdd"><a onclick="dlgProjSet()">Projekteinstellungen</a><div class="msep"></div><a onclick="dlgSV()">Sozialversicherungsbeiträge</a><a onclick="dlgTarife()">Tarife</a><a onclick="dlgDA()">Dienstarten verwalten</a><a onclick="dlgKST()">Kostenstellen verwalten</a><div class="msep"></div><a onclick="dlgET()">Entgelttabelle</a><a onclick="dlgSZG()">Jahressonderzahlung</a><a onclick="dlgTE()">Tariferhöhungen</a></div></div>
+ <div class="mi" tabindex="0"><span>Berichtswesen</span><div class="mdd"><a onclick="acOpen()">Analysecenter</a></div></div>
+ <div class="mi" tabindex="0" onclick="szOpen()"><span>Szenariovergleich</span></div>
+ <div class="mr"><span id="nav-title" class="nt">PKR</span><span id="save-ind" class="si"></span></div>
+</nav>
+<div class="app-layout">
+ <div class="lp">
+  <div class="lpt">Mitarbeiter</div>
+  <div class="sr"><label>Suche:</label><input type="text" id="ma-q" class="inp sm" oninput="filt()"><label>DA:</label><select id="f-da" class="inp sm" onchange="filt()"><option value="">Alle</option></select><label>KSt:</label><select id="f-kst" class="inp sm" onchange="filt()"><option value="">Alle</option></select></div>
+  <div class="sr"><label>Gruppierung:</label><label class="rl"><input type="radio" name="grp" value="" checked onchange="setGrp('')"> Keine</label><label class="rl"><input type="radio" name="grp" value="da" onchange="setGrp('da')"> Dienstart</label><label class="rl"><input type="radio" name="grp" value="kst" onchange="setGrp('kst')"> Kostenstelle</label></div>
+  <div class="sr"><button class="be" onclick="maAdd()">+ Neu</button><button class="be" onclick="maDel()">Entfernen</button><button class="be" onclick="maDup()">Duplizieren</button><button class="be" onclick="maAll()">Alle auswählen</button><button class="be bi" onclick="ladeProjekt()" title="Aktualisieren">&#x21bb;</button><button class="be bi" onclick="dlgSpalten()" title="Spalten">&#x2699;</button></div>
+  <div class="mw"><table class="tt" id="tma"><thead id="mth"><tr></tr></thead><tbody id="mtb"></tbody></table></div>
+  <div class="gl" id="gk">Gesamtkosten alle Mitarbeiter: 0,00 &euro;</div>
+ </div>
+ <div class="rp">
+  <div class="tbar"><button class="tb active" onclick="swTab('stamm',this)">Stammdaten</button><button class="tb" onclick="swTab('plan',this)">Planung / Hochrechnung</button></div>
+  <div class="tp active" id="tab-stamm">
+   <div id="se" class="eh">Mitarbeiter auswählen oder neu anlegen</div>
+   <div id="sf" style="display:none">
+    <div class="sg"><fieldset><legend>Persönliche Daten</legend><div class="fr"><div class="fg"><label>Personalnummer:</label><input type="text" id="s-pnr" class="inp"></div><div class="fg"><label>Titel:</label><input type="text" id="s-titel" class="inp" style="width:70px"></div><div class="fg"><label>Nachname:</label><input type="text" id="s-nachname" class="inp"></div><div class="fg"><label>Vorname:</label><input type="text" id="s-vorname" class="inp"></div></div></fieldset>
+    <fieldset><legend>Organisation</legend><div class="fr"><div class="fg"><label>Dienstart:</label><select id="s-da" class="inp"></select></div><div class="fg"><label>Kostenstelle:</label><select id="s-kst" class="inp"></select></div><div class="fg"><label>Vollkraft (VK):</label><input type="text" id="s-vk" class="inp" style="width:70px" oninput="updWstd()"></div><div class="fg"><label>Wochenstunden:</label><input type="text" id="s-wstd" class="inp" style="width:70px" readonly></div></div><div id="s-winfo" class="il">Tarifstunden: -</div></fieldset></div>
+    <div class="sg"><fieldset><legend>Vergütung</legend><div class="fr"><div class="fg"><label>Tarif:</label><select id="s-tarif" class="inp" onchange="onTarif()"></select></div><div class="fg"><label>Entgeltgruppe:</label><select id="s-eg" class="inp" onchange="onEg()"></select></div><div class="fg"><label>Stufe:</label><select id="s-stufe" class="inp" onchange="onStufe()"></select></div><div class="fg"><label>Monatsbrutto (&euro;):</label><input type="text" id="s-brutto" class="inp" style="width:110px"></div></div><button class="be" onclick="bruttoET()" style="margin-top:4px">Aus Entgelttabelle laden</button></fieldset>
+    <fieldset><legend>Ein-/Austritt</legend><div class="fr"><div class="fg"><label>Eintritt (TT.MM.JJJJ):</label><input type="text" id="s-ein" class="inp" style="width:120px"></div><div class="fg"><label>Austritt (TT.MM.JJJJ):</label><input type="text" id="s-aus" class="inp" style="width:120px"></div></div></fieldset></div>
+    <fieldset><legend>Bemerkungen</legend><textarea id="s-bem" class="inp" rows="3" style="width:100%"></textarea></fieldset>
+    <div class="sa"><button class="be ba" onclick="projektSpeichern()">Projekt speichern</button><button class="be ba" id="btn-ss" onclick="stammSave()">Stammdaten speichern</button></div>
+   </div>
+  </div>
+  <div class="tp" id="tab-plan">
+   <div id="pe" class="eh">Mitarbeiter auswählen</div>
+   <div id="pc" style="display:none">
+    <div class="st">Anpassungen</div>
+    <div class="sr"><button class="be" onclick="dlgStufe()">Stufenaufstieg</button><button class="be" onclick="dlgErh()">Erhöhung</button><button class="be" onclick="dlgStd()">Stundenanpassung</button><button class="be" onclick="dlgAbw()">Abwesenheit</button><button class="be" onclick="dlgSzP()">Jahressonderzahlung</button><button class="be" onclick="anpDel()">Entfernen</button></div>
+    <div class="aw"><table class="tt" id="tanp"><thead><tr><th>Typ</th><th>Details</th><th>Ab Monat</th><th>Bemerkung</th></tr></thead><tbody id="atb"></tbody></table></div>
+    <div class="st" style="margin-top:6px">Jahreshochrechnung</div>
+    <div class="sr hrc"><label class="cl"><input type="checkbox" id="cv" onchange="ergR()"> VK</label><label class="cl"><input type="checkbox" id="cs" onchange="ergR()"> Std</label><label class="cl"><input type="checkbox" id="ca" onchange="ergR()"> Anteil</label><label class="cl"><input type="checkbox" id="cb" checked onchange="ergR()"> Brutto</label><label class="cl"><input type="checkbox" id="csz" checked onchange="ergR()"> SZ</label><label class="cl"><input type="checkbox" id="cag" checked onchange="ergR()"> AG</label><label class="cl"><input type="checkbox" id="cg" checked onchange="ergR()"> Gesamt</label><button class="be" style="margin-left:auto;font-size:11px" onclick="rstIst()">Manuelle Änderungen zurücksetzen</button></div>
+    <div class="ew"><table class="tt tn" id="terg"><thead id="eth"><tr></tr></thead><tbody id="etb"></tbody></table></div>
+    <div class="es" id="esum"></div>
+   </div>
+  </div>
+ </div>
+</div>
+<div id="dov" class="ov" style="display:none" onclick="if(event.target===this)DC()"></div>
+<div id="dbox" class="db" style="display:none"><div class="dh"><span id="dtit"></span><button class="dx" onclick="DC()">&#x2715;</button></div><div id="dbod" class="dbd"></div></div>
+<div id="aov" class="ov" style="display:none" onclick="if(event.target===this)acClose()"></div>
+<div id="abox" class="ab" style="display:none"><div class="dh"><span>Analysecenter</span><button class="dx" onclick="acClose()">&#x2715;</button></div><div class="acl"><div class="acll"><div class="st">Mitarbeiterauswahl</div><div class="sr"><label>Suche:</label><input type="text" id="aq" class="inp sm" oninput="acFilt()"></div><div id="aml" class="acml"></div><div class="sr"><button class="be" onclick="acAll(1)">Alle</button><button class="be" onclick="acAll(0)">Keine</button><label>DA:</label><select id="afda" class="inp sm" onchange="acFDA()"><option value="">&#x2013;</option></select><label>KSt:</label><select id="afkst" class="inp sm" onchange="acFKST()"><option value="">&#x2013;</option></select></div><div class="st">Berichte</div><div class="acb"><label class="rl"><input type="radio" name="atyp" value="verlauf" checked> Jahresverlauf</label><label class="rl"><input type="radio" name="atyp" value="da"> Nach Dienstart</label><label class="rl"><input type="radio" name="atyp" value="kst"> Nach Kostenstelle</label><label class="rl"><input type="radio" name="atyp" value="ma"> Mitarbeitervergleich</label><label class="rl"><input type="radio" name="atyp" value="uebersicht"> Gesamtübersicht</label><label class="rl"><input type="radio" name="atyp" value="detail"> Detail pro Mitarbeiter</label></div><button class="be ba" style="margin-top:8px;width:100%" onclick="acRun()">Vorschau aktualisieren</button></div><div class="aclr" id="apv"><div class="eh">Bericht auswählen und "Vorschau aktualisieren" klicken</div></div></div></div>
+<div id="sov" class="ov" style="display:none" onclick="if(event.target===this)szClose()"></div>
+<div id="sbox" class="ab" style="display:none"><div class="dh"><span>Szenariovergleich</span><button class="dx" onclick="szClose()">&#x2715;</button></div><div id="sbod" style="padding:12px;overflow:auto;flex:1"></div></div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script><script src="js/calc.js"></script><script src="js/db.js"></script><script src="js/app.js"></script>
+<script>var pid=new URLSearchParams(location.search).get('id');if(pid){initDB(SUPABASE_URL,SUPABASE_KEY);initProjekt(pid)}else location.href='index.html';document.addEventListener('keydown',function(e){if(e.ctrlKey&&e.key==='s'){e.preventDefault();projektSpeichern()}})</script>
+</body></html>

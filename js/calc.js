@@ -20,12 +20,7 @@ function neuesProjekt() {
     return { name:"Neues Projekt", jahr:new Date().getFullYear(),
         sv:{"KV":7.3,"Zusatzbeitrag KV":0.7,"RV":9.3,"AV":1.3,"PV":1.7,"Insolvenzumlage":0.06,"U1":1.6,"U2":0.44},
         tarife:{}, dienstarten:{}, kostenstellen:{}, entgelttabelle:{}, sonderzahlung:{},
-        sz_monat:11, sz_prozent:90.0, tariferhoehungen:[],
-        // Szenarien wie in der EXE (Szenario 0 = Ist-Stand)
-        szenarien:[],
-        // optionaler Änderungs-/System-Log wie in der EXE
-        log:[],
-        mitarbeiter:[] };
+        sz_monat:11, sz_prozent:90.0, tariferhoehungen:[], mitarbeiter:[] };
 }
 function neuerMa() {
     return { pnr:"",titel:"",vorname:"",nachname:"",eg:"",stufe:"",brutto:0,tarif:"",da:"",kst:"",vk:1.0,
@@ -64,53 +59,10 @@ function kstBezeichnung(p,kst) { return ((p.kostenstellen||{})[String(kst)]||{})
 function daBezeichnung(p,da) { return ((p.dienstarten||{})[String(da)]||{}).bezeichnung||''; }
 
 function anteil(p,ma,m) {
-    // UTC-safe day arithmetic (verhindert DST-/Sommerzeit-Off-by-one)
-    var j = p.jahr, tg = daysInMonth(j, m);
-    var DAY = 86400000;
-
-    function dayIndex(d) {
-        // d ist Date (lokal) -> auf UTC-Mitternacht normalisieren
-        return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY);
-    }
-
-    var e1 = new Date(j, m-1, 1);
-    var eL = new Date(j, m-1, tg);
-    var sDay = dayIndex(e1);
-    var eDay = dayIndex(eL);
-
-    if (ma.eintritt) {
-        var d = parseDatum(ma.eintritt);
-        if (d) {
-            var di = dayIndex(d);
-            if (di > eDay) return 0;
-            if (di > sDay) sDay = di;
-        }
-    }
-    if (ma.austritt) {
-        var d2 = parseDatum(ma.austritt);
-        if (d2) {
-            var da = dayIndex(d2);
-            if (da < dayIndex(e1)) return 0;
-            if (da < eDay) eDay = da;
-        }
-    }
-    if (sDay > eDay) return 0;
-
-    var arbeitstage = (eDay - sDay) + 1;
-
-    var abws = ma.abwesenheiten || [];
-    for (var i = 0; i < abws.length; i++) {
-        var av = parseDatum(abws[i].von), ab = parseDatum(abws[i].bis);
-        if (av && ab) {
-            var avDay = dayIndex(av), abDay = dayIndex(ab);
-            var os = (avDay > sDay) ? avDay : sDay;
-            var oe = (abDay < eDay) ? abDay : eDay;
-            if (os <= oe) arbeitstage -= (oe - os) + 1;
-        }
-    }
-
-    return Math.max(0, arbeitstage / tg);
-}
+    var j=p.jahr, tg=daysInMonth(j,m);
+    var e1=new Date(j,m-1,1), eL=new Date(j,m-1,tg);
+    var s=new Date(e1.getTime()), e=new Date(eL.getTime());
+    if (ma.eintritt) { var d=parseDatum(ma.eintritt); if(d){if(d>eL)return 0;if(d>s)s=d;} }
     if (ma.austritt) { var d=parseDatum(ma.austritt); if(d){if(d<e1)return 0;if(d<e)e=d;} }
     if (s>e) return 0;
     var arbeitstage=Math.round((e-s)/86400000)+1;
